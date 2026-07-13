@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import as_obj, ext_id, s
+from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
 
 _VMS = "/api/vmm/v4.0/ahv/config/vms"
 _RECOVERY_POINTS = "/api/dataprotection/v4.0/config/recovery-points"
@@ -23,7 +23,7 @@ _PROTECTION_POLICIES = "/api/dataprotection/v4.0/config/protection-policies"
 
 def _snapshots_path(vm_ext_id: str) -> str:
     """Snapshots collection path for one VM."""
-    return f"{_VMS}/{vm_ext_id}/snapshots"
+    return f"{_VMS}/{_seg(vm_ext_id)}/snapshots"
 
 
 # ── reads ────────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ def list_protection_domains(conn: Any) -> list[dict]:
 
 def create_snapshot(conn: Any, vm_ext_id: str, name: str) -> dict:
     """[WRITE][low] Create a snapshot of a VM (reversible → delete the snapshot)."""
-    _raw, etag = conn.get_with_etag(f"{_VMS}/{vm_ext_id}")
+    _raw, etag = conn.get_with_etag(f"{_VMS}/{_seg(vm_ext_id)}")
     resp = as_obj(conn.post(_snapshots_path(vm_ext_id), etag=etag, json={"name": name}))
     return {"action": "create_snapshot", "vmExtId": s(vm_ext_id), "name": s(name),
             "taskExtId": ext_id(resp)}
@@ -87,7 +87,7 @@ def create_snapshot(conn: Any, vm_ext_id: str, name: str) -> dict:
 
 def delete_snapshot(conn: Any, vm_ext_id: str, snapshot_ext_id: str) -> dict:
     """[WRITE][high] Delete a VM snapshot — captures the prior name for the audit trail."""
-    path = f"{_snapshots_path(vm_ext_id)}/{snapshot_ext_id}"
+    path = f"{_snapshots_path(vm_ext_id)}/{_seg(snapshot_ext_id)}"
     raw, etag = conn.get_with_etag(path)
     obj = as_obj(raw)
     conn.delete(path, etag=etag)
@@ -97,9 +97,9 @@ def delete_snapshot(conn: Any, vm_ext_id: str, snapshot_ext_id: str) -> dict:
 
 def restore_snapshot(conn: Any, vm_ext_id: str, snapshot_ext_id: str) -> dict:
     """[WRITE][high] Revert a VM to a snapshot — destructive, NOT safely undoable."""
-    raw, etag = conn.get_with_etag(f"{_VMS}/{vm_ext_id}")
+    raw, etag = conn.get_with_etag(f"{_VMS}/{_seg(vm_ext_id)}")
     obj = as_obj(raw)
-    resp = as_obj(conn.post(f"{_VMS}/{vm_ext_id}/$actions/revert", etag=etag,
+    resp = as_obj(conn.post(f"{_VMS}/{_seg(vm_ext_id)}/$actions/revert", etag=etag,
                             json={"snapshotExtId": snapshot_ext_id}))
     return {"action": "restore_snapshot", "vmExtId": s(vm_ext_id),
             "snapshotExtId": s(snapshot_ext_id),
@@ -109,14 +109,14 @@ def restore_snapshot(conn: Any, vm_ext_id: str, snapshot_ext_id: str) -> dict:
 
 def protect_vm(conn: Any, vm_ext_id: str, policy_ext_id: str) -> dict:
     """[WRITE][medium] Associate a VM with a protection policy."""
-    conn.post(f"{_PROTECTION_POLICIES}/{policy_ext_id}/$actions/associate-vm",
+    conn.post(f"{_PROTECTION_POLICIES}/{_seg(policy_ext_id)}/$actions/associate-vm",
               json={"vmExtId": vm_ext_id})
     return {"action": "protect_vm", "vmExtId": s(vm_ext_id), "policyExtId": s(policy_ext_id)}
 
 
 def failover_pd(conn: Any, policy_ext_id: str, cluster_ext_id: str) -> dict:
     """[WRITE][high] Fail a protection domain over to a target cluster (DR event)."""
-    resp = as_obj(conn.post(f"{_PROTECTION_POLICIES}/{policy_ext_id}/$actions/failover",
+    resp = as_obj(conn.post(f"{_PROTECTION_POLICIES}/{_seg(policy_ext_id)}/$actions/failover",
                             json={"targetClusterExtId": cluster_ext_id}))
     return {"action": "failover_pd", "policyExtId": s(policy_ext_id),
             "targetClusterExtId": s(cluster_ext_id), "taskExtId": ext_id(resp)}

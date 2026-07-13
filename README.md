@@ -20,8 +20,7 @@ against a live Prism Central.**
   fetches and sends `If-Match` for you.
 - **Automatic pagination** — list tools return the full set, not just page one.
 - **Mixed-hypervisor VM listing** — `vm_list` returns both **AHV** and **ESXi**
-  guests under the same Prism Central (built for Broadcom→Nutanix migration
-  estates).
+  guests under the same Prism Central (built for hypervisor-migration estates).
 - **Governance harness** — audit / token+call budget / risk-tier approval /
   undo-token / prompt-injection sanitize, with **dry-run + double-confirm** on
   destructive writes.

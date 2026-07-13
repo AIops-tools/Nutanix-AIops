@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import as_obj, ext_id, s
+from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
 
 _ALERTS = "/api/monitoring/v4.0/serviceability/alerts"
 _EVENTS = "/api/monitoring/v4.0/serviceability/events"
@@ -74,20 +74,20 @@ def list_audits(conn: Any) -> list[dict]:
 
 def acknowledge_alert(conn: Any, alert_ext_id: str) -> dict:
     """[WRITE] Acknowledge an alert, capturing its prior acknowledged state."""
-    raw, etag = conn.get_with_etag(f"{_ALERTS}/{alert_ext_id}")
+    raw, etag = conn.get_with_etag(f"{_ALERTS}/{_seg(alert_ext_id)}")
     obj = as_obj(raw)
     prior = obj.get("acknowledged")
-    conn.post(f"{_ALERTS}/{alert_ext_id}/$actions/acknowledge", etag=etag, json={})
+    conn.post(f"{_ALERTS}/{_seg(alert_ext_id)}/$actions/acknowledge", etag=etag, json={})
     return {"action": "acknowledge_alert", "extId": s(alert_ext_id),
             "priorState": {"acknowledged": prior}}
 
 
 def resolve_alert(conn: Any, alert_ext_id: str) -> dict:
     """[WRITE] Resolve an alert, capturing its prior resolved state."""
-    raw, etag = conn.get_with_etag(f"{_ALERTS}/{alert_ext_id}")
+    raw, etag = conn.get_with_etag(f"{_ALERTS}/{_seg(alert_ext_id)}")
     obj = as_obj(raw)
     prior = obj.get("resolved")
-    conn.post(f"{_ALERTS}/{alert_ext_id}/$actions/resolve", etag=etag, json={})
+    conn.post(f"{_ALERTS}/{_seg(alert_ext_id)}/$actions/resolve", etag=etag, json={})
     return {"action": "resolve_alert", "extId": s(alert_ext_id),
             "priorState": {"resolved": prior}}
 
@@ -141,7 +141,7 @@ def analyze_alert(conn: Any, alert_ext_id: str) -> dict:
     clock or randomness — so the same inputs always produce the same summary.
     """
     try:
-        raw = as_obj(conn.get(f"{_ALERTS}/{alert_ext_id}"))
+        raw = as_obj(conn.get(f"{_ALERTS}/{_seg(alert_ext_id)}"))
         alert = _norm_alert(raw)
         affected = alert["affectedEntityExtId"]
         related = [

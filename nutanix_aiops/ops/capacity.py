@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import as_obj, ext_id, s
+from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
 
 _TASKS = "/api/prism/v4.0/config/tasks"
 _CLUSTERS = "/api/clustermgmt/v4.0/config/clusters"
@@ -59,7 +59,7 @@ def get_capacity_runway(
     a failing read yields an ``error`` field rather than raising.
     """
     try:
-        raw = as_obj(conn.get(f"{_CLUSTERS}/{cluster_ext_id}"))
+        raw = as_obj(conn.get(f"{_CLUSTERS}/{_seg(cluster_ext_id)}"))
     except Exception as exc:  # noqa: BLE001 — report as partial
         return {"error": s(exc, 200), "clusterExtId": s(cluster_ext_id)}
 

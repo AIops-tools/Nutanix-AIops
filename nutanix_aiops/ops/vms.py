@@ -6,16 +6,16 @@ Prism v4 footgun handled once, here, so no tool has to. Reversible writes
 capture the VM's BEFORE state into ``priorState`` so the harness can record a
 faithful undo (e.g. re-power, restore the prior CPU/memory).
 
-``list_vms`` surfaces BOTH AHV and ESXi-backed VMs (Prism Central sees both
-during a Broadcom→Nutanix migration); the ``hypervisor`` field distinguishes
-them so an agent isn't blind to the half of the estate still on ESXi.
+``list_vms`` surfaces BOTH AHV and ESXi-backed VMs (Prism Central sees both in
+hypervisor-migration estates); the ``hypervisor`` field distinguishes them so
+an agent isn't blind to the half of the estate still on ESXi.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import as_obj, ext_id, s
+from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
 
 _VMS = "/api/vmm/v4.0/ahv/config/vms"
 
@@ -63,7 +63,7 @@ def get_vm(conn: Any, vm_ext_id: str) -> dict:
     The ``_etag`` is what any downstream mutation needs for If-Match; exposing it
     on the read lets an agent chain get→update without a second round trip.
     """
-    raw, etag = conn.get_with_etag(f"{_VMS}/{vm_ext_id}")
+    raw, etag = conn.get_with_etag(f"{_VMS}/{_seg(vm_ext_id)}")
     obj = as_obj(raw)
     if not obj:
         raise KeyError(f"VM '{vm_ext_id}' not found.")
@@ -74,7 +74,7 @@ def get_vm(conn: Any, vm_ext_id: str) -> dict:
 
 def _vm_raw(conn: Any, vm_ext_id: str) -> tuple[dict, str]:
     """Fetch a VM's raw record + ETag, raising KeyError if absent."""
-    raw, etag = conn.get_with_etag(f"{_VMS}/{vm_ext_id}")
+    raw, etag = conn.get_with_etag(f"{_VMS}/{_seg(vm_ext_id)}")
     obj = as_obj(raw)
     if not obj:
         raise KeyError(f"VM '{vm_ext_id}' not found.")
@@ -85,7 +85,7 @@ def _power_action(conn: Any, vm_ext_id: str, action: str) -> dict:
     """Run a power ``$action`` with the VM's current ETag, capturing prior power state."""
     obj, etag = _vm_raw(conn, vm_ext_id)
     prior = s(obj.get("powerState"))
-    conn.post(f"{_VMS}/{vm_ext_id}/$actions/{action}", etag=etag, json={})
+    conn.post(f"{_VMS}/{_seg(vm_ext_id)}/$actions/{action}", etag=etag, json={})
     return {
         "action": action,
         "extId": s(vm_ext_id),
@@ -148,7 +148,7 @@ def update_vm(
         body["numSockets"] = num_sockets
     if memory_bytes is not None:
         body["memorySizeBytes"] = memory_bytes
-    conn.put(f"{_VMS}/{vm_ext_id}", etag=etag, json=body)
+    conn.put(f"{_VMS}/{_seg(vm_ext_id)}", etag=etag, json=body)
     return {"action": "update_vm", "extId": s(vm_ext_id), "name": s(obj.get("name")),
             "priorState": prior}
 
@@ -156,7 +156,7 @@ def update_vm(
 def clone_vm(conn: Any, vm_ext_id: str, new_name: str) -> dict:
     """[WRITE] Clone a VM to a new name (reversible → delete the clone)."""
     obj, etag = _vm_raw(conn, vm_ext_id)
-    resp = as_obj(conn.post(f"{_VMS}/{vm_ext_id}/$actions/clone", etag=etag,
+    resp = as_obj(conn.post(f"{_VMS}/{_seg(vm_ext_id)}/$actions/clone", etag=etag,
                             json={"name": new_name}))
     return {"action": "clone_vm", "sourceExtId": s(vm_ext_id), "newName": s(new_name),
             "taskExtId": ext_id(resp)}
@@ -165,7 +165,7 @@ def clone_vm(conn: Any, vm_ext_id: str, new_name: str) -> dict:
 def delete_vm(conn: Any, vm_ext_id: str) -> dict:
     """[WRITE][high] Delete a VM — captures the prior name/power state for the audit trail."""
     obj, etag = _vm_raw(conn, vm_ext_id)
-    conn.delete(f"{_VMS}/{vm_ext_id}", etag=etag)
+    conn.delete(f"{_VMS}/{_seg(vm_ext_id)}", etag=etag)
     return {"action": "delete_vm", "extId": s(vm_ext_id), "name": s(obj.get("name")),
             "priorState": {"powerState": s(obj.get("powerState"))}}
 
@@ -175,7 +175,7 @@ def migrate_vm(conn: Any, vm_ext_id: str, target_host_ext_id: str) -> dict:
     obj, etag = _vm_raw(conn, vm_ext_id)
     prior_host = s((obj.get("host") or {}).get("extId"))
     resp = as_obj(conn.post(
-        f"{_VMS}/{vm_ext_id}/$actions/migrate",
+        f"{_VMS}/{_seg(vm_ext_id)}/$actions/migrate",
         etag=etag,
         json={"targetHost": {"extId": target_host_ext_id}},
     ))

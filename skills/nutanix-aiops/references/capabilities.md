@@ -107,7 +107,7 @@
 - **Pagination** — all list tools follow `$page` / `$limit` and return the full
   set, not just page one.
 - **Mixed hypervisor** — `vm_list` returns both **AHV** and **ESXi** VMs managed
-  by the same Prism Central (relevant to Broadcom→Nutanix migration estates).
+  by the same Prism Central (relevant to hypervisor-migration estates).
 
 ## Out of scope (by design, this release)
 

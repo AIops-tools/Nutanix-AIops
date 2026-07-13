@@ -48,7 +48,7 @@ def cli_errors(fn: Callable) -> Callable:
     return wrapper
 
 
-def get_connection(target: str | None, config_path: Path | None = None):
+def get_connection(target: str | None, config_path: Path | None = None) -> tuple[Any, Any]:
     """Return a (conn, config) tuple for the given target."""
     from nutanix_aiops.config import load_config
     from nutanix_aiops.connection import ConnectionManager

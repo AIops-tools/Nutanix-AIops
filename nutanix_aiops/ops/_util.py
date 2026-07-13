@@ -3,14 +3,25 @@
 Prism Central v4 list endpoints wrap results in ``{"data": [...], "metadata":
 {...}}``; single-entity GETs return ``{"data": {...}}``. ``as_list`` / ``as_obj``
 normalise both. All API-returned text reaches the caller only after
-``sanitize()`` (prompt-injection defense).
+``sanitize()`` (encoding-level output hygiene), and agent-supplied identifiers
+are URL-encoded via ``_seg()`` before being placed into a REST URL path.
 """
 
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from nutanix_aiops.governance import sanitize
+
+
+def _seg(value: Any) -> str:
+    """URL-encode one path segment so an id can never break out of its slot.
+
+    ``quote(..., safe="")`` also encodes ``/``, so a hostile identifier such as
+    ``../other`` cannot traverse into a different endpoint.
+    """
+    return quote(str(value), safe="")
 
 
 def as_list(data: Any) -> list[dict]:

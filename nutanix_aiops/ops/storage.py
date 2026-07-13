@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import as_obj, ext_id, s
+from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
 
 _CONTAINERS = "/api/clustermgmt/v4.0/config/storage-containers"
 
@@ -36,7 +36,7 @@ def list_storage_containers(conn: Any) -> list[dict]:
 
 def _container_raw(conn: Any, ext_id_: str) -> tuple[dict, str]:
     """Fetch a container's raw record + ETag, raising KeyError if absent."""
-    raw, etag = conn.get_with_etag(f"{_CONTAINERS}/{ext_id_}")
+    raw, etag = conn.get_with_etag(f"{_CONTAINERS}/{_seg(ext_id_)}")
     obj = as_obj(raw)
     if not obj:
         raise KeyError(f"Storage container '{ext_id_}' not found.")
@@ -81,7 +81,7 @@ def update_storage_container(
         body["maxCapacityBytes"] = max_capacity_bytes
     if replication_factor is not None:
         body["replicationFactor"] = replication_factor
-    conn.put(f"{_CONTAINERS}/{ext_id}", etag=etag, json=body)
+    conn.put(f"{_CONTAINERS}/{_seg(ext_id)}", etag=etag, json=body)
     return {
         "action": "update_storage_container",
         "extId": s(ext_id),
@@ -93,7 +93,7 @@ def update_storage_container(
 def delete_storage_container(conn: Any, ext_id: str) -> dict:
     """[WRITE][high] Delete a storage container — captures prior state for the audit trail."""
     obj, etag = _container_raw(conn, ext_id)
-    conn.delete(f"{_CONTAINERS}/{ext_id}", etag=etag)
+    conn.delete(f"{_CONTAINERS}/{_seg(ext_id)}", etag=etag)
     return {
         "action": "delete_storage_container",
         "extId": s(ext_id),

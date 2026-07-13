@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import as_obj, ext_id, s
+from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
 
 _IMAGES = "/api/vmm/v4.0/content/images"
 _CATEGORIES = "/api/prism/v4.0/config/categories"
@@ -40,11 +40,11 @@ def list_images(conn: Any) -> list[dict]:
 
 def delete_image(conn: Any, ext_id: str) -> dict:
     """[WRITE][high] Delete an image — captures the prior name for the audit trail."""
-    raw, etag = conn.get_with_etag(f"{_IMAGES}/{ext_id}")
+    raw, etag = conn.get_with_etag(f"{_IMAGES}/{_seg(ext_id)}")
     obj = as_obj(raw)
     if not obj:
         raise KeyError(f"Image '{ext_id}' not found.")
-    conn.delete(f"{_IMAGES}/{ext_id}", etag=etag)
+    conn.delete(f"{_IMAGES}/{_seg(ext_id)}", etag=etag)
     return {"action": "delete_image", "extId": s(ext_id),
             "priorState": {"name": s(obj.get("name"))}}
 
@@ -81,7 +81,7 @@ def assign_category(conn: Any, category_ext_id: str, vm_ext_ids: list[str]) -> d
     """[WRITE] Bulk-associate a category to a set of VMs."""
     entities = [{"extId": s(vid), "entityType": "VM"} for vid in vm_ext_ids]
     conn.post(
-        f"{_CATEGORIES}/{category_ext_id}/$actions/associate",
+        f"{_CATEGORIES}/{_seg(category_ext_id)}/$actions/associate",
         json={"entities": entities},
     )
     return {"action": "assign_category", "categoryExtId": s(category_ext_id),

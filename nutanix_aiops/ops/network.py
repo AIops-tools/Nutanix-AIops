@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import as_obj, ext_id, s
+from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
 
 _SUBNETS = "/api/networking/v4.0/config/subnets"
 
@@ -58,7 +58,7 @@ def get_subnet(conn: Any, ext_id: str) -> dict:
     The ``_etag`` is what any downstream mutation needs for If-Match; exposing it
     on the read lets an agent chain get→delete without a second round trip.
     """
-    raw, etag = conn.get_with_etag(f"{_SUBNETS}/{ext_id}")
+    raw, etag = conn.get_with_etag(f"{_SUBNETS}/{_seg(ext_id)}")
     obj = as_obj(raw)
     if not obj:
         raise KeyError(f"Subnet '{ext_id}' not found.")
@@ -69,7 +69,7 @@ def get_subnet(conn: Any, ext_id: str) -> dict:
 
 def _subnet_raw(conn: Any, ext_id: str) -> tuple[dict, str]:
     """Fetch a subnet's raw record + ETag, raising KeyError if absent."""
-    raw, etag = conn.get_with_etag(f"{_SUBNETS}/{ext_id}")
+    raw, etag = conn.get_with_etag(f"{_SUBNETS}/{_seg(ext_id)}")
     obj = as_obj(raw)
     if not obj:
         raise KeyError(f"Subnet '{ext_id}' not found.")
@@ -98,6 +98,6 @@ def create_subnet(
 def delete_subnet(conn: Any, ext_id: str) -> dict:
     """[WRITE][high] Delete a subnet — captures the prior name for the audit trail."""
     obj, etag = _subnet_raw(conn, ext_id)
-    conn.delete(f"{_SUBNETS}/{ext_id}", etag=etag)
+    conn.delete(f"{_SUBNETS}/{_seg(ext_id)}", etag=etag)
     return {"action": "delete_subnet", "extId": s(ext_id),
             "name": s(obj.get("name")), "priorState": {"name": s(obj.get("name"))}}

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import as_obj, ext_id, s
+from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
 
 _CLUSTERS = "/api/clustermgmt/v4.0/config/clusters"
 _HOSTS = "/api/clustermgmt/v4.0/config/hosts"
@@ -42,7 +42,7 @@ def get_cluster_health(conn: Any, cluster_ext_id: str) -> dict:
     raised traceback (a health probe must survive the thing it probes).
     """
     try:
-        raw = as_obj(conn.get(f"{_CLUSTERS}/{cluster_ext_id}"))
+        raw = as_obj(conn.get(f"{_CLUSTERS}/{_seg(cluster_ext_id)}"))
     except Exception as exc:  # noqa: BLE001 — report as partial
         return {"error": s(exc, 200), "clusterExtId": s(cluster_ext_id)}
     cluster = _norm_cluster(raw)
@@ -79,7 +79,7 @@ def get_cluster_utilization(conn: Any, cluster_ext_id: str) -> dict:
     ``None`` rather than invented values.
     """
     try:
-        raw = as_obj(conn.get(f"{_CLUSTERS}/{cluster_ext_id}"))
+        raw = as_obj(conn.get(f"{_CLUSTERS}/{_seg(cluster_ext_id)}"))
     except Exception as exc:  # noqa: BLE001 — report as partial
         return {"error": s(exc, 200), "clusterExtId": s(cluster_ext_id)}
     stats = raw.get("stats") or {}

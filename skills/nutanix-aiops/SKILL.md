@@ -30,7 +30,7 @@ compatibility: >
 
 Governed Nutanix **Prism Central (v4 REST API)** operations — **47 MCP tools**, every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.nutanix-aiops/`, policy engine, token/runaway budget guard, undo-token recording, and graduated-autonomy risk tiers. The Prism Central password is stored **encrypted** (`~/.nutanix-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
 
-**What sets it apart** from read-only Nutanix MCPs: (1) automatic **ETag / If-Match** on every mutation — the v4 footgun handled for you; (2) automatic **pagination**; (3) **mixed-hypervisor** VM listing (AHV + ESXi, relevant to Broadcom→Nutanix migration estates); and (4) the governance harness with **dry-run + double-confirm** on destructive writes.
+**What sets it apart** from read-only Nutanix MCPs: (1) automatic **ETag / If-Match** on every mutation — the v4 footgun handled for you; (2) automatic **pagination**; (3) **mixed-hypervisor** VM listing (AHV + ESXi, relevant to hypervisor-migration estates); and (4) the governance harness with **dry-run + double-confirm** on destructive writes.
 
 > **Standalone**: the governance harness is bundled in the package (`nutanix_aiops.governance`) — no external skill-family dependency. **Preview / mock-only**: not yet validated against a live Prism Central.
 

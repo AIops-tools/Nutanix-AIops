@@ -71,10 +71,17 @@ def test_all_modules_import():
 
 
 @pytest.mark.unit
-def test_version():
+def test_version_matches_pyproject():
+    """__version__ is single-sourced from package metadata; it must track
+    pyproject.toml so a release bump can never ship a stale self-report."""
+    import tomllib
+    from pathlib import Path
+
     import nutanix_aiops
 
-    assert nutanix_aiops.__version__ == "0.1.0"
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    expected = tomllib.loads(pyproject.read_text("utf-8"))["project"]["version"]
+    assert nutanix_aiops.__version__ == expected
 
 
 @pytest.mark.unit
@@ -296,6 +303,26 @@ def test_cli_vm_delete_dry_run_gates(monkeypatch):
     result = runner.invoke(app, ["vm", "delete", "v1", "--dry-run"])
     assert result.exit_code == 0
     assert "DRY-RUN" in result.output
+
+
+# ── URL path-segment encoding ───────────────────────────────────────────
+
+
+@pytest.mark.unit
+def test_path_segments_are_url_encoded_against_traversal():
+    """A hostile extId containing ``../`` must not reach the wire as a raw
+    traversal — ``_seg`` percent-encodes every path segment (incl. ``/``)."""
+    from nutanix_aiops.ops import vms as ops
+
+    conn = MagicMock(name="conn")
+    conn.get_with_etag.return_value = (
+        {"data": {"extId": "v1", "name": "web01", "powerState": "ON"}}, "etag-1",
+    )
+    ops.get_vm(conn, "../../../api/other")
+    path = conn.get_with_etag.call_args[0][0]
+    assert "../" not in path
+    assert "%2F" in path
+    assert path.startswith("/api/vmm/v4.0/ahv/config/vms/")
 
 
 # ── overview resilience ─────────────────────────────────────────────────
