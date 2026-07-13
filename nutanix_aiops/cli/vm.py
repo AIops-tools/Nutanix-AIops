@@ -58,18 +58,17 @@ def vm_power(
     dry_run: DryRunOption = False,
 ) -> None:
     """Change a VM's power state (on/off/shutdown/reboot)."""
-    from nutanix_aiops.ops import vms as ops
+    from mcp_server.tools import vms as gov
 
-    fns = {"on": ops.power_on, "off": ops.power_off,
-           "shutdown": ops.guest_shutdown, "reboot": ops.reboot_vm}
+    fns = {"on": gov.vm_power_on, "off": gov.vm_power_off,
+           "shutdown": gov.vm_guest_shutdown, "reboot": gov.vm_reboot}
     if action not in fns:
         raise typer.BadParameter("action must be one of: on, off, shutdown, reboot")
     if dry_run:
         dry_run_print(operation=f"vm power {action}",
                       api_call=f"POST /api/vmm/v4.0/ahv/config/vms/{vm_ext_id}/$actions/{action}")
         return
-    conn, _ = get_connection(target)
-    console.print_json(json.dumps(fns[action](conn, vm_ext_id)))
+    console.print_json(json.dumps(fns[action](vm_ext_id=vm_ext_id, target=target)))
 
 
 @vm_app.command("delete")
@@ -80,15 +79,14 @@ def vm_delete(
     dry_run: DryRunOption = False,
 ) -> None:
     """Delete a VM (destructive; dry-run + double confirm)."""
-    from nutanix_aiops.ops import vms as ops
+    from mcp_server.tools import vms as gov
 
     if dry_run:
         dry_run_print(operation="delete_vm",
                       api_call=f"DELETE /api/vmm/v4.0/ahv/config/vms/{vm_ext_id}")
         return
     double_confirm("delete VM", vm_ext_id)
-    conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.delete_vm(conn, vm_ext_id)))
+    console.print_json(json.dumps(gov.vm_delete(vm_ext_id=vm_ext_id, target=target)))
 
 
 @vm_app.command("migrate")
@@ -100,7 +98,7 @@ def vm_migrate(
     dry_run: DryRunOption = False,
 ) -> None:
     """Live-migrate a VM to another host (dry-run + double confirm)."""
-    from nutanix_aiops.ops import vms as ops
+    from mcp_server.tools import vms as gov
 
     if dry_run:
         dry_run_print(operation="migrate_vm",
@@ -108,5 +106,6 @@ def vm_migrate(
                       parameters={"targetHost": target_host_ext_id})
         return
     double_confirm("migrate VM", vm_ext_id)
-    conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.migrate_vm(conn, vm_ext_id, target_host_ext_id)))
+    console.print_json(json.dumps(
+        gov.vm_migrate(vm_ext_id=vm_ext_id, target_host_ext_id=target_host_ext_id, target=target)
+    ))
