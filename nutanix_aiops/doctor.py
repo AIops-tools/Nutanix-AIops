@@ -55,8 +55,8 @@ def run_doctor(skip_auth: bool = False) -> int:
 
     for target in config.targets:
         try:
-            _ = target.api_key
-            _console.print(f"[green]✓ API key present for '{target.name}'[/]")
+            _ = target.password
+            _console.print(f"[green]✓ Password present for '{target.name}'[/]")
         except OSError as exc:
             _console.print(f"[red]✗ {exc}[/]")
             problems += 1

@@ -78,11 +78,25 @@ def list_protection_domains(conn: Any) -> list[dict]:
 
 
 def create_snapshot(conn: Any, vm_ext_id: str, name: str) -> dict:
-    """[WRITE][low] Create a snapshot of a VM (reversible → delete the snapshot)."""
+    """[WRITE][low] Create a snapshot of a VM (reversible → delete the snapshot).
+
+    The v4 create is async and returns a TASK extId, which is useless as an undo
+    target. Best-effort: resolve the real snapshot extId by listing and matching
+    the (caller-chosen) name — ``snapshotExtId`` is "" when the snapshot has not
+    materialised yet, in which case no undo is recorded (honest degradation).
+    """
     _raw, etag = conn.get_with_etag(f"{_VMS}/{_seg(vm_ext_id)}")
     resp = as_obj(conn.post(_snapshots_path(vm_ext_id), etag=etag, json={"name": name}))
+    snapshot_ext_id = ""
+    try:
+        for snap in list_snapshots(conn, vm_ext_id):
+            if snap.get("name") == name:
+                snapshot_ext_id = snap.get("extId", "")
+                break
+    except Exception:  # noqa: BLE001 — best-effort resolution must not fail the write
+        pass
     return {"action": "create_snapshot", "vmExtId": s(vm_ext_id), "name": s(name),
-            "taskExtId": ext_id(resp)}
+            "taskExtId": ext_id(resp), "snapshotExtId": s(snapshot_ext_id)}
 
 
 def delete_snapshot(conn: Any, vm_ext_id: str, snapshot_ext_id: str) -> dict:

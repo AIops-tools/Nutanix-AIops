@@ -17,10 +17,16 @@ from nutanix_aiops.ops import dataprotection as ops
 
 
 def _create_snapshot_undo(params: dict[str, Any], result: Any) -> Optional[dict]:
-    """Inverse of create_snapshot: delete the snapshot that was just created."""
+    """Inverse of create_snapshot: delete the snapshot that was just created.
+
+    Uses the RESOLVED snapshot extId (the taskExtId from the async create is a
+    task id, not a deletable entity). When resolution failed (snapshot not yet
+    materialised), returns None — recording an unreplayable undo would be worse
+    than recording none.
+    """
     if not isinstance(result, dict):
         return None
-    snap = result.get("taskExtId")
+    snap = result.get("snapshotExtId")
     vm = params.get("vm_ext_id")
     if not snap or not vm:
         return None
