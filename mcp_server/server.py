@@ -27,6 +27,7 @@ from mcp_server.tools import (  # noqa: F401 — side effects
     lcm,
     network,
     storage,
+    undo,
     vms,
 )
 

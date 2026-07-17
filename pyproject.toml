@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nutanix-aiops"
-version = "0.2.1"
+version = "0.3.0"
 description = "Governed AI-ops for Nutanix Prism Central (v4): cluster/VM/storage/network/DR/alert/LCM operations with automatic ETag & pagination handling and a built-in governance harness (audit, budget, undo, risk tiers)"
 readme = "README.md"
 license = "MIT"

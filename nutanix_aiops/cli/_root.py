@@ -10,6 +10,7 @@ from nutanix_aiops.cli.doctor import doctor_cmd
 from nutanix_aiops.cli.init import init_cmd
 from nutanix_aiops.cli.overview import overview_cmd
 from nutanix_aiops.cli.secret import secret_app
+from nutanix_aiops.cli.undo import undo_app
 from nutanix_aiops.cli.vm import vm_app
 
 app = typer.Typer(
@@ -22,6 +23,7 @@ app = typer.Typer(
 app.add_typer(cluster_app, name="cluster")
 app.add_typer(vm_app, name="vm")
 app.add_typer(secret_app, name="secret")
+app.add_typer(undo_app, name="undo")
 app.command("init")(init_cmd)
 app.command("overview")(overview_cmd)
 app.command("doctor")(doctor_cmd)

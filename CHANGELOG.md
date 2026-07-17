@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0 — 2026-07-17
+
+### Added
+- **Undo executor**: `undo list` / `undo apply <id>` (CLI + MCP) — apply a recorded replayable inverse; the dispatched inverse is re-gated by its own risk tier; single-use, dry-run, double-confirm, both wrapper + inverse audited.
+- Coverage: ops/CLI/connection layers now near-fully tested.
+
 ## v0.2.1 — 2026-07-16
 
 ### Fixed
