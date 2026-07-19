@@ -15,7 +15,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
+from nutanix_aiops.ops._util import (
+    DEFAULT_LIST_LIMIT,
+    _seg,
+    as_obj,
+    envelope,
+    ext_id,
+    fetch_page,
+    opt,
+    s,
+)
 
 _IMAGES = "/api/vmm/v4.0/content/images"
 _CATEGORIES = "/api/prism/v4.0/config/categories"
@@ -26,16 +35,17 @@ def _norm_image(raw: dict) -> dict:
     placement = raw.get("clusterLocationExtIds") or raw.get("clusterExtIds") or []
     return {
         "extId": ext_id(raw),
-        "name": s(raw.get("name")),
-        "type": s(raw.get("type")),
+        "name": opt(raw.get("name")),
+        "type": opt(raw.get("type")),
         "sizeBytes": raw.get("sizeBytes"),
         "clusterExtIds": [s(c) for c in placement],
     }
 
 
-def list_images(conn: Any) -> list[dict]:
-    """[READ] All content-library images, normalised (auto-paginated)."""
-    return [_norm_image(r) for r in conn.list_all(_IMAGES)]
+def list_images(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] Content-library images, normalised, in a truncation-aware envelope."""
+    raw, truncated = fetch_page(conn, _IMAGES, limit)
+    return envelope("images", [_norm_image(r) for r in raw], limit, truncated)
 
 
 def delete_image(conn: Any, ext_id: str) -> dict:
@@ -46,22 +56,23 @@ def delete_image(conn: Any, ext_id: str) -> dict:
         raise KeyError(f"Image '{ext_id}' not found.")
     conn.delete(f"{_IMAGES}/{_seg(ext_id)}", etag=etag)
     return {"action": "delete_image", "extId": s(ext_id),
-            "priorState": {"name": s(obj.get("name"))}}
+            "priorState": {"name": opt(obj.get("name"))}}
 
 
 def _norm_category(raw: dict) -> dict:
     """Fold one raw category record into the stable inventory shape."""
     return {
         "extId": ext_id(raw),
-        "key": s(raw.get("key")),
-        "value": s(raw.get("value")),
-        "description": s(raw.get("description")),
+        "key": opt(raw.get("key")),
+        "value": opt(raw.get("value")),
+        "description": opt(raw.get("description")),
     }
 
 
-def list_categories(conn: Any) -> list[dict]:
-    """[READ] All categories, normalised (auto-paginated)."""
-    return [_norm_category(r) for r in conn.list_all(_CATEGORIES)]
+def list_categories(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] Categories, normalised, in a truncation-aware envelope."""
+    raw, truncated = fetch_page(conn, _CATEGORIES, limit)
+    return envelope("categories", [_norm_category(r) for r in raw], limit, truncated)
 
 
 def create_category(conn: Any, key: str, value: str, description: str = "") -> dict:

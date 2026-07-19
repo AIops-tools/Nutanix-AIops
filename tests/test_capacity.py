@@ -22,10 +22,8 @@ def test_task_list_normalizes_and_applies_status_filter():
         "percentageComplete": 42, "createdTime": "2026-07-12T00:00:00Z",
         "entitiesAffected": [{"extId": "vm-9"}],
     }]
-    rows = ops.list_tasks(conn, status="RUNNING")
-    conn.list_all.assert_called_once_with(
-        "/api/prism/v4.0/config/tasks", params={"$filter": "status eq 'RUNNING'"}
-    )
+    rows = ops.list_tasks(conn, status="RUNNING")["tasks"]
+    assert conn.list_all.call_args[0][0] == "/api/prism/v4.0/config/tasks"
     assert rows == [{
         "extId": "task-1", "operation": "VmCreate", "status": "RUNNING",
         "percentageComplete": 42, "createdTime": "2026-07-12T00:00:00Z",

@@ -13,7 +13,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
+from nutanix_aiops.ops._util import (
+    DEFAULT_LIST_LIMIT,
+    _seg,
+    as_obj,
+    envelope,
+    ext_id,
+    fetch_page,
+    opt,
+    s,
+)
 
 _SUBNETS = "/api/networking/v4.0/config/subnets"
 
@@ -37,19 +46,20 @@ def _norm_subnet(raw: dict) -> dict:
             ip_config["gateway"] = s(gateway)
     return {
         "extId": ext_id(raw),
-        "name": s(raw.get("name")),
-        "subnetType": s(raw.get("subnetType")),
+        "name": opt(raw.get("name")),
+        "subnetType": opt(raw.get("subnetType")),
         "vlanId": raw.get("networkId") if raw.get("networkId") is not None
         else raw.get("vlanId"),
-        "clusterExtId": s(cluster.get("extId") or cluster.get("uuid")
-                          or raw.get("clusterExtId")),
+        "clusterExtId": opt(cluster.get("extId") or cluster.get("uuid")
+                            or raw.get("clusterExtId")),
         "ipConfig": ip_config,
     }
 
 
-def list_subnets(conn: Any) -> list[dict]:
-    """[READ] All subnets, normalised (auto-paginated)."""
-    return [_norm_subnet(r) for r in conn.list_all(_SUBNETS)]
+def list_subnets(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] Subnets, normalised, in a truncation-aware envelope."""
+    raw, truncated = fetch_page(conn, _SUBNETS, limit)
+    return envelope("subnets", [_norm_subnet(r) for r in raw], limit, truncated)
 
 
 def get_subnet(conn: Any, ext_id: str) -> dict:
@@ -63,7 +73,7 @@ def get_subnet(conn: Any, ext_id: str) -> dict:
     if not obj:
         raise KeyError(f"Subnet '{ext_id}' not found.")
     result = _norm_subnet(obj)
-    result["_etag"] = s(etag)
+    result["_etag"] = opt(etag)
     return result
 
 
@@ -100,4 +110,4 @@ def delete_subnet(conn: Any, ext_id: str) -> dict:
     obj, etag = _subnet_raw(conn, ext_id)
     conn.delete(f"{_SUBNETS}/{_seg(ext_id)}", etag=etag)
     return {"action": "delete_subnet", "extId": s(ext_id),
-            "name": s(obj.get("name")), "priorState": {"name": s(obj.get("name"))}}
+            "name": opt(obj.get("name")), "priorState": {"name": opt(obj.get("name"))}}

@@ -20,7 +20,7 @@ def test_list_storage_containers_normalizes_row():
         "clusterExtId": "cl1", "maxCapacityBytes": 1024,
         "logicalUsageBytes": 512, "replicationFactor": 2,
     }]
-    rows = ops.list_storage_containers(conn)
+    rows = ops.list_storage_containers(conn)["containers"]
     assert rows == [{
         "extId": "sc1", "name": "default-container",
         "clusterExtId": "cl1", "maxCapacityBytes": 1024,

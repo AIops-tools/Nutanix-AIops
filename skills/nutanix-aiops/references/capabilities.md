@@ -1,6 +1,6 @@
 # nutanix-aiops capabilities
 
-> Preview / mock-only. **47 MCP tools** (21 read, 26 write) over the Nutanix
+> **51 MCP tools** (24 read, 27 write) over the Nutanix
 > **Prism Central v4 REST API** (HTTPS :9440, HTTP Basic auth). Every mutation
 > handles **ETag / If-Match** automatically; every list is **paginated**
 > automatically. Paths below are the v4 API prefixes actually called; validate
@@ -97,6 +97,31 @@
 |------|----------|---------|
 | `task_list` | `GET /api/prism/v4.0/config/tasks` | recent Prism tasks (status, entity, progress) |
 | `capacity_runway` | derived from cluster utilization | **days-to-full forecast** per resource |
+
+## Diagnostics / RCA (2 read)
+
+Read-only signature analyses (`risk_level="low"`). Both are **pure and
+deterministic** — no clock, no randomness — and every finding carries the
+measured number or raw Prism state that tripped it, alongside a probable cause
+and a concrete action. Findings are returned worst-first
+(critical → warning → info) with the shape
+`{severity, resource, signal, detail, cause, action}`.
+
+| Tool | API paths read | Returns |
+|------|----------------|---------|
+| `cluster_health_rca` | `clusters` + `clusters/{extId}` + `hosts` + `storage-containers` | findings for degraded `faultToleranceState`, cluster storage pool and storage containers over **80% (warning) / 90% (critical)**, hosts whose `nodeStatus` is unhealthy, and clusters with fewer visible hosts than their `nodeCount`; plus a `summary` of every measured percentage |
+| `alert_triage_rca` | `serviceability/alerts` | active (unresolved) alerts grouped by severity with a per-level count, unacknowledged criticals called out, and `oldestUnresolved` (title, severity, `ageDays`) — an alert open **≥ 7 days** is flagged stale |
+
+`alert_triage_rca` is the fleet-level lens; `analyze_alert` is the per-alert
+lens (event correlation on one alert's affected entity). They compose: triage
+first to pick the extId, then analyze it.
+
+## Undo (1 read, 1 write)
+
+| Tool | Risk | Returns / effect |
+|------|:----:|------------------|
+| `undo_list` | low | recorded, not-yet-applied reversible writes — `undoId`, original tool, inverse tool, note |
+| `undo_apply` | medium | executes a recorded inverse descriptor; itself governed and audited, single-use, supports `dry_run` |
 
 ## ETag / pagination / mixed hypervisor
 

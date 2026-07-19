@@ -7,7 +7,14 @@ from typing import Annotated
 
 import typer
 
-from nutanix_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from nutanix_aiops.cli._common import (
+    LimitOption,
+    TargetOption,
+    cli_errors,
+    console,
+    get_connection,
+    print_envelope,
+)
 
 cluster_app = typer.Typer(
     name="cluster",
@@ -20,12 +27,12 @@ ExtIdArg = Annotated[str, typer.Argument(help="Cluster extId (from 'cluster list
 
 @cluster_app.command("list")
 @cli_errors
-def cluster_list(target: TargetOption = None) -> None:
+def cluster_list(limit: LimitOption = 500, target: TargetOption = None) -> None:
     """List registered clusters."""
     from nutanix_aiops.ops import clusters as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.list_clusters(conn)))
+    print_envelope(ops.list_clusters(conn, limit=limit), "clusters")
 
 
 @cluster_app.command("health")
@@ -40,12 +47,12 @@ def cluster_health(cluster_ext_id: ExtIdArg, target: TargetOption = None) -> Non
 
 @cluster_app.command("hosts")
 @cli_errors
-def cluster_hosts(target: TargetOption = None) -> None:
+def cluster_hosts(limit: LimitOption = 500, target: TargetOption = None) -> None:
     """List hosts across all clusters."""
     from nutanix_aiops.ops import clusters as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.list_hosts(conn)))
+    print_envelope(ops.list_hosts(conn, limit=limit), "hosts")
 
 
 @cluster_app.command("util")

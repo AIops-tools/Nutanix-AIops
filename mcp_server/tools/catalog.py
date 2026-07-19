@@ -17,25 +17,29 @@ from nutanix_aiops.ops import catalog as ops
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def image_list(target: Optional[str] = None) -> list:
+def image_list(limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List content-library images (extId, name, type, size, cluster placement).
 
     Args:
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_images(_get_connection(target))
+    return ops.list_images(_get_connection(target), limit=limit)
 
 
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def category_list(target: Optional[str] = None) -> list:
+def category_list(limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List categories (extId, key, value, description).
 
     Args:
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_categories(_get_connection(target))
+    return ops.list_categories(_get_connection(target), limit=limit)
 
 
 # ── writes ───────────────────────────────────────────────────────────────
@@ -65,7 +69,7 @@ def image_delete(ext_id: str, dry_run: bool = False, target: Optional[str] = Non
 
 
 @mcp.tool()
-@governed_tool(risk_level="low")
+@governed_tool(risk_level="medium")
 @tool_errors("dict")
 def category_create(
     key: str,
@@ -73,7 +77,7 @@ def category_create(
     description: str = "",
     target: Optional[str] = None,
 ) -> dict:
-    """[WRITE][risk=low] Create a category key/value pair.
+    """[WRITE][risk=medium] Create a category key/value pair.
 
     Args:
         key: Category key (e.g. "Environment").

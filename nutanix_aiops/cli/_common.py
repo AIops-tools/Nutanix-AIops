@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any
@@ -20,6 +21,25 @@ TargetOption = Annotated[
 DryRunOption = Annotated[
     bool, typer.Option("--dry-run", help="Print the API call without executing")
 ]
+LimitOption = Annotated[
+    int, typer.Option("--limit", help="Max rows to return (default 500)")
+]
+
+
+def print_envelope(result: dict, key: str) -> None:
+    """Print a list envelope as JSON and say so out loud when it was truncated.
+
+    The ``truncated`` flag is already in the JSON, but a smaller model reading a
+    capped result reliably treats it as complete unless the cap is stated in
+    plain language too.
+    """
+    console.print_json(json.dumps(result))
+    if result.get("truncated"):
+        console.print(
+            f"[yellow]… {len(result.get(key, []))} of more than "
+            f"{result.get('limit')} {key} shown — output truncated, re-run with "
+            f"a higher --limit to see the rest.[/]"
+        )
 
 
 def _cli_error_types() -> tuple[type[BaseException], ...]:

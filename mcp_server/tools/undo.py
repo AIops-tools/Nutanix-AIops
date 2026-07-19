@@ -36,13 +36,23 @@ def undo_list(limit: int = 50, target: Optional[str] = None) -> dict:
     Each entry names the original tool, the inverse tool that ``undo_apply``
     would run, and a human note. Use the ``undoId`` with ``undo_apply``.
 
+    ``truncated`` is measured — one extra row is fetched — so a capped listing
+    announces itself instead of looking like the complete set.
+
     Args:
-        limit: Max rows to return (default 50).
+        limit: Max rows to return (default 50). Re-run with a higher limit when
+            the result reports ``truncated: true``.
         target: Unused (undo state is host-local); accepted for CLI uniformity.
     """
-    rows = get_undo_store().list(status="recorded", limit=max(1, min(limit, 500)))
+    capped = max(1, min(limit, 500))
+    fetched = get_undo_store().list(status="recorded", limit=capped + 1)
+    truncated = len(fetched) > capped
+    rows = fetched[:capped]
     return {
         "count": len(rows),
+        "returned": len(rows),
+        "limit": capped,
+        "truncated": truncated,
         "undos": [
             {
                 "undoId": r["undo_id"],

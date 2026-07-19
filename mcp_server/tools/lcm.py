@@ -16,24 +16,26 @@ from nutanix_aiops.ops import lcm as ops
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def lcm_inventory(target: Optional[str] = None) -> list:
+def lcm_inventory(limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List LCM-managed entities: current/available versions and updateAvailable.
 
     Args:
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_lcm_inventory(_get_connection(target))
+    return ops.list_lcm_inventory(_get_connection(target), limit=limit)
 
 
 @mcp.tool()
-@governed_tool(risk_level="low")
+@governed_tool(risk_level="medium")
 @tool_errors("dict")
 def lcm_precheck(
     cluster_ext_id: str,
     entity_ext_ids: list[str],
     target: Optional[str] = None,
 ) -> dict:
-    """[WRITE][risk=low] Run LCM prechecks for entities on a cluster (read-safe validation).
+    """[WRITE][risk=medium] Run LCM prechecks for entities on a cluster (read-safe validation).
 
     Args:
         cluster_ext_id: Cluster extId as returned by cluster_list.

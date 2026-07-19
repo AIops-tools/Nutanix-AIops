@@ -13,4 +13,11 @@ def overview_cmd(target: TargetOption = None) -> None:
     from nutanix_aiops.ops import overview as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.fleet_overview(conn)))
+    result = ops.fleet_overview(conn)
+    console.print_json(json.dumps(result))
+    if result.get("truncated"):
+        console.print(
+            f"[yellow]… {', '.join(result['truncated'])} inventory truncated — "
+            f"the counts above are a lower bound; re-run the per-resource list "
+            f"command with a higher --limit.[/]"
+        )

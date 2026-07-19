@@ -10,7 +10,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
+from nutanix_aiops.ops._util import (
+    DEFAULT_LIST_LIMIT,
+    _seg,
+    as_obj,
+    envelope,
+    ext_id,
+    fetch_page,
+    opt,
+    s,
+)
 
 _CLUSTERS = "/api/clustermgmt/v4.0/config/clusters"
 _HOSTS = "/api/clustermgmt/v4.0/config/hosts"
@@ -22,17 +31,18 @@ def _norm_cluster(raw: dict) -> dict:
     nodes = raw.get("nodes") or {}
     return {
         "extId": ext_id(raw),
-        "name": s(raw.get("name") or cfg.get("name")),
-        "aosVersion": s(cfg.get("buildInfo", {}).get("version") or cfg.get("aosVersion")),
+        "name": opt(raw.get("name") or cfg.get("name")),
+        "aosVersion": opt(cfg.get("buildInfo", {}).get("version") or cfg.get("aosVersion")),
         "hypervisorTypes": [s(h) for h in (cfg.get("hypervisorTypes") or [])],
         "nodeCount": nodes.get("numberOfNodes") if isinstance(nodes, dict) else None,
         "clusterFunction": [s(f) for f in (cfg.get("clusterFunction") or [])],
     }
 
 
-def list_clusters(conn: Any) -> list[dict]:
-    """[READ] All registered clusters, normalised (auto-paginated)."""
-    return [_norm_cluster(r) for r in conn.list_all(_CLUSTERS)]
+def list_clusters(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] Registered clusters, normalised, in a truncation-aware envelope."""
+    raw, truncated = fetch_page(conn, _CLUSTERS, limit)
+    return envelope("clusters", [_norm_cluster(r) for r in raw], limit, truncated)
 
 
 def get_cluster_health(conn: Any, cluster_ext_id: str) -> dict:
@@ -50,7 +60,7 @@ def get_cluster_health(conn: Any, cluster_ext_id: str) -> dict:
     return {
         **cluster,
         "upgradeStatus": s(upgrade) if upgrade else None,
-        "resiliencyState": s((raw.get("config") or {}).get("faultToleranceState")),
+        "resiliencyState": opt((raw.get("config") or {}).get("faultToleranceState")),
     }
 
 
@@ -58,18 +68,20 @@ def _norm_host(raw: dict) -> dict:
     """Fold one raw host record into the stable inventory shape."""
     return {
         "extId": ext_id(raw),
-        "name": s(raw.get("hostName") or raw.get("name")),
-        "clusterExtId": s((raw.get("cluster") or {}).get("uuid") or raw.get("clusterExtId")),
-        "hypervisor": s((raw.get("hypervisor") or {}).get("type") or raw.get("hypervisorType")),
+        "name": opt(raw.get("hostName") or raw.get("name")),
+        "clusterExtId": opt((raw.get("cluster") or {}).get("uuid") or raw.get("clusterExtId")),
+        "hypervisor": opt((raw.get("hypervisor") or {}).get("type") or raw.get("hypervisorType")),
+        "nodeStatus": opt(raw.get("nodeStatus") or raw.get("state")),
         "numCpuCores": raw.get("numberOfCpuCores"),
         "memoryBytes": raw.get("memorySizeBytes"),
         "bootTimeUsecs": raw.get("bootTimeUsecs"),
     }
 
 
-def list_hosts(conn: Any) -> list[dict]:
-    """[READ] All hosts across clusters, normalised (auto-paginated)."""
-    return [_norm_host(r) for r in conn.list_all(_HOSTS)]
+def list_hosts(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] Hosts across clusters, normalised, in a truncation-aware envelope."""
+    raw, truncated = fetch_page(conn, _HOSTS, limit)
+    return envelope("hosts", [_norm_host(r) for r in raw], limit, truncated)
 
 
 def get_cluster_utilization(conn: Any, cluster_ext_id: str) -> dict:
@@ -85,10 +97,39 @@ def get_cluster_utilization(conn: Any, cluster_ext_id: str) -> dict:
     stats = raw.get("stats") or {}
     return {
         "clusterExtId": ext_id(raw),
-        "name": s(raw.get("name")),
+        "name": opt(raw.get("name")),
         "cpuUsagePercent": stats.get("hypervisorCpuUsagePpm"),
         "memoryUsagePercent": stats.get("hypervisorMemoryUsagePpm"),
         "storageUsageBytes": stats.get("storageUsageBytes"),
         "storageCapacityBytes": stats.get("storageCapacityBytes"),
         "iops": stats.get("controllerNumIops"),
     }
+
+
+def list_cluster_reports(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> list[dict]:
+    """[READ] Per-cluster health merged with its utilization, for every cluster.
+
+    The single collection step behind the diagnostics layer: one dict per cluster
+    carrying resiliency/upgrade/nodeCount (health) plus storage usage/capacity
+    (utilization). Resilient by construction — ``get_cluster_health`` and
+    ``get_cluster_utilization`` each degrade to an ``error`` field, and a health
+    error is preserved rather than masked by the utilization merge.
+
+    Returns a bare list: it is an internal collection step for the diagnostics
+    analyses, which report their own ``clustersAnalyzed`` count. The MCP-facing
+    truncation envelope lives on ``list_clusters``.
+    """
+    reports: list[dict] = []
+    for cluster in list_clusters(conn, limit=limit)["clusters"]:
+        cid = cluster["extId"]
+        health = get_cluster_health(conn, cid)
+        if health.get("error"):
+            reports.append({**cluster, **health})
+            continue
+        util = get_cluster_utilization(conn, cid)
+        storage = {
+            k: util.get(k) for k in ("storageUsageBytes", "storageCapacityBytes")
+            if not util.get("error")
+        }
+        reports.append({**cluster, **health, **storage})
+    return reports

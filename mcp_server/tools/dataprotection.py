@@ -41,48 +41,54 @@ def _create_snapshot_undo(params: dict[str, Any], result: Any) -> Optional[dict]
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def snapshot_list(vm_ext_id: str, target: Optional[str] = None) -> list:
+def snapshot_list(vm_ext_id: str, limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List a VM's snapshots (extId, name, createTime) — spot lingering snapshots.
 
     Args:
         vm_ext_id: VM extId as returned by vm_list.
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_snapshots(_get_connection(target), vm_ext_id)
+    return ops.list_snapshots(_get_connection(target), vm_ext_id, limit=limit)
 
 
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def recovery_point_list(target: Optional[str] = None) -> list:
+def recovery_point_list(limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List recovery points (extId, vmExtId, create/expiration time, locationType).
 
     Args:
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_recovery_points(_get_connection(target))
+    return ops.list_recovery_points(_get_connection(target), limit=limit)
 
 
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def protection_domain_list(target: Optional[str] = None) -> list:
+def protection_domain_list(limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List protection domains / policies (extId, name, replicationType).
 
     Args:
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_protection_domains(_get_connection(target))
+    return ops.list_protection_domains(_get_connection(target), limit=limit)
 
 
 # ── writes ───────────────────────────────────────────────────────────────
 
 
 @mcp.tool()
-@governed_tool(risk_level="low", undo=_create_snapshot_undo)
+@governed_tool(risk_level="medium", undo=_create_snapshot_undo)
 @tool_errors("dict")
 def snapshot_create(vm_ext_id: str, name: str, target: Optional[str] = None) -> dict:
-    """[WRITE][risk=low] Snapshot a VM (reversible → delete the snapshot). Auto-handles ETag.
+    """[WRITE][risk=medium] Snapshot a VM (reversible → delete the snapshot). Auto-handles ETag.
 
     Args:
         vm_ext_id: VM extId as returned by vm_list.

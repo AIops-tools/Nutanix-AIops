@@ -17,13 +17,15 @@ from nutanix_aiops.ops import network as ops
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def subnet_list(target: Optional[str] = None) -> list:
+def subnet_list(limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List subnets (extId, name, type, VLAN, cluster, IP config).
 
     Args:
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_subnets(_get_connection(target))
+    return ops.list_subnets(_get_connection(target), limit=limit)
 
 
 @mcp.tool()

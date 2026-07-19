@@ -40,8 +40,8 @@ def test_norm_vm_extracts_nic_ips_and_cluster_host_refs():
             ],
         }
     ]
-    (row,) = ops.list_vms(conn)
-    conn.list_all.assert_called_once_with(_VMS)
+    (row,) = ops.list_vms(conn)["vms"]
+    assert conn.list_all.call_args[0][0] == _VMS
     assert row["extId"] == "vm-1"
     assert row["hypervisor"] == "AHV"  # default when no hypervisorType/source
     assert row["clusterExtId"] == "cl-1"
@@ -56,10 +56,10 @@ def test_list_vms_include_esxi_false_filters_out_esxi_backed_vms():
         {"extId": "vm-ahv", "name": "a", "hypervisorType": "AHV"},
         {"extId": "vm-esxi", "name": "b", "source": {"entityType": "ESXi"}},
     ]
-    all_rows = ops.list_vms(conn, include_esxi=True)
+    all_rows = ops.list_vms(conn, include_esxi=True)["vms"]
     assert {r["extId"] for r in all_rows} == {"vm-ahv", "vm-esxi"}
 
-    ahv_only = ops.list_vms(conn, include_esxi=False)
+    ahv_only = ops.list_vms(conn, include_esxi=False)["vms"]
     assert [r["extId"] for r in ahv_only] == ["vm-ahv"]
     assert ahv_only[0]["hypervisor"] == "AHV"
 

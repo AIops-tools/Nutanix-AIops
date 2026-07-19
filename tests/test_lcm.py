@@ -22,7 +22,7 @@ def test_lcm_inventory_normalizes_and_computes_update_available():
         {"extId": "e2", "entityClass": "software", "entityModel": "AOS",
          "currentVersion": "6.5", "availableVersion": "6.5"},
     ]
-    rows = ops.list_lcm_inventory(conn)
+    rows = ops.list_lcm_inventory(conn)["entities"]
     assert rows[0]["updateAvailable"] is True
     assert rows[0]["currentVersion"] == "1.0"
     assert rows[0]["availableVersion"] == "1.2"
@@ -53,7 +53,7 @@ def test_write_tools_have_correct_risk_tiers():
     from mcp_server.tools import lcm
 
     assert lcm.lcm_update._risk_level == "high"
-    assert lcm.lcm_precheck._risk_level == "low"
+    assert lcm.lcm_precheck._risk_level == "medium"
 
 
 @pytest.mark.unit

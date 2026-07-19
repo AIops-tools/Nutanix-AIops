@@ -1,7 +1,7 @@
 # nutanix-aiops CLI reference
 
-> Preview / mock-only. Talks to Nutanix **Prism Central v4** on HTTPS `:9440`
-> with HTTP Basic auth. The CLI is a convenience subset; the full **47-tool**
+> Talks to Nutanix **Prism Central v4** on HTTPS `:9440`
+> with HTTP Basic auth. The CLI is a convenience subset; the full **51-tool**
 > surface is via the MCP server (`nutanix-aiops mcp`).
 
 ## Setup & diagnostics
@@ -26,6 +26,16 @@ nutanix-aiops cluster health <cluster_ext_id>      # services, resiliency, upgra
 nutanix-aiops cluster hosts                         # hosts across all clusters
 nutanix-aiops cluster util <cluster_ext_id>        # CPU / memory / storage / IOPS utilization
 ```
+
+## Diagnostics / RCA (read-only)
+
+```bash
+nutanix-aiops diagnose cluster-health              # resiliency, storage >80%/>90%, nodes down — worst first
+nutanix-aiops diagnose alert-triage                # active alerts by severity + oldest unresolved
+```
+
+Both print a worst-first findings table (severity · resource · signal · detail ·
+action) or a green all-clear line when every measured value is under threshold.
 
 ## VMs
 
@@ -56,8 +66,9 @@ nutanix-aiops secret rotate-password                # re-encrypt the store under
 
 ## Full surface via MCP
 
-The 47 governed tools (clusters, VMs, storage, network, catalog, data
-protection / DR, alerts + `analyze_alert` RCA, LCM upgrades, capacity runway)
+The 51 governed tools (clusters, VMs, storage, network, catalog, data
+protection / DR, alerts + `analyze_alert` RCA, LCM upgrades, capacity runway,
+and the `cluster_health_rca` / `alert_triage_rca` diagnostics)
 are exposed by `nutanix-aiops mcp`. Set `NUTANIX_AIOPS_MASTER_PASSWORD` so the
 encrypted store unlocks non-interactively. See `capabilities.md` for the full
 tool → API-path → returns map.

@@ -18,38 +18,46 @@ from nutanix_aiops.ops import alerts as ops
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def alert_list(severity: Optional[str] = None, target: Optional[str] = None) -> list:
+def alert_list(
+    severity: Optional[str] = None, limit: int = 500, target: Optional[str] = None
+) -> dict:
     """[READ] List alerts (extId, title, severity, impact, ack/resolved, affected entity).
 
     Args:
         severity: Filter to one severity (e.g. CRITICAL); omit for all severities.
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_alerts(_get_connection(target), severity=severity)
+    return ops.list_alerts(_get_connection(target), severity=severity, limit=limit)
 
 
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def event_list(target: Optional[str] = None) -> list:
+def event_list(limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List events (extId, title, creation time, source entity).
 
     Args:
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_events(_get_connection(target))
+    return ops.list_events(_get_connection(target), limit=limit)
 
 
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def audit_list(target: Optional[str] = None) -> list:
+def audit_list(limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List config audit records (extId, operation type, user, creation time).
 
     Args:
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_audits(_get_connection(target))
+    return ops.list_audits(_get_connection(target), limit=limit)
 
 
 @mcp.tool()
@@ -72,10 +80,10 @@ def analyze_alert(alert_ext_id: str, target: Optional[str] = None) -> dict:
 
 
 @mcp.tool()
-@governed_tool(risk_level="low")
+@governed_tool(risk_level="medium")
 @tool_errors("dict")
 def alert_acknowledge(alert_ext_id: str, target: Optional[str] = None) -> dict:
-    """[WRITE][risk=low] Acknowledge an alert. Auto-handles ETag; captures prior state.
+    """[WRITE][risk=medium] Acknowledge an alert. Auto-handles ETag; captures prior state.
 
     Args:
         alert_ext_id: Alert extId as returned by alert_list.
@@ -85,10 +93,10 @@ def alert_acknowledge(alert_ext_id: str, target: Optional[str] = None) -> dict:
 
 
 @mcp.tool()
-@governed_tool(risk_level="low")
+@governed_tool(risk_level="medium")
 @tool_errors("dict")
 def alert_resolve(alert_ext_id: str, target: Optional[str] = None) -> dict:
-    """[WRITE][risk=low] Resolve an alert. Auto-handles ETag; captures prior state.
+    """[WRITE][risk=medium] Resolve an alert. Auto-handles ETag; captures prior state.
 
     Args:
         alert_ext_id: Alert extId as returned by alert_list.

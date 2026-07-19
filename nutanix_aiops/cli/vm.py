@@ -9,12 +9,14 @@ import typer
 
 from nutanix_aiops.cli._common import (
     DryRunOption,
+    LimitOption,
     TargetOption,
     cli_errors,
     console,
     double_confirm,
     dry_run_print,
     get_connection,
+    print_envelope,
 )
 
 vm_app = typer.Typer(
@@ -30,13 +32,14 @@ ExtIdArg = Annotated[str, typer.Argument(help="VM extId (from 'vm list')")]
 @cli_errors
 def vm_list(
     include_esxi: Annotated[bool, typer.Option("--esxi/--no-esxi")] = True,
+    limit: LimitOption = 500,
     target: TargetOption = None,
 ) -> None:
     """List VMs (AHV + ESXi by default)."""
     from nutanix_aiops.ops import vms as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.list_vms(conn, include_esxi=include_esxi)))
+    print_envelope(ops.list_vms(conn, include_esxi=include_esxi, limit=limit), "vms")
 
 
 @vm_app.command("get")

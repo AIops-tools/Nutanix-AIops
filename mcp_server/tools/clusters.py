@@ -10,15 +10,17 @@ from nutanix_aiops.ops import clusters as ops
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def cluster_list(target: Optional[str] = None) -> list:
+def cluster_list(limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List registered clusters (extId, name, AOS version, hypervisors, nodes).
 
     Call this first — most other tools need a clusterExtId from here.
 
     Args:
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_clusters(_get_connection(target))
+    return ops.list_clusters(_get_connection(target), limit=limit)
 
 
 @mcp.tool()
@@ -37,13 +39,15 @@ def cluster_health(cluster_ext_id: str, target: Optional[str] = None) -> dict:
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def host_list(target: Optional[str] = None) -> list:
+def host_list(limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List hosts across all clusters (extId, cluster, hypervisor, CPU/mem).
 
     Args:
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_hosts(_get_connection(target))
+    return ops.list_hosts(_get_connection(target), limit=limit)
 
 
 @mcp.tool()

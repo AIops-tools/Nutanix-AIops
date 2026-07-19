@@ -33,7 +33,7 @@ def test_list_subnets_normalizes():
             ],
         }
     ]
-    rows = ops.list_subnets(conn)
+    rows = ops.list_subnets(conn)["subnets"]
     assert rows == [
         {
             "extId": "sn1",
@@ -44,7 +44,7 @@ def test_list_subnets_normalizes():
             "ipConfig": {"cidr": "10.0.0.0/24", "gateway": "10.0.0.1"},
         }
     ]
-    conn.list_all.assert_called_once_with("/api/networking/v4.0/config/subnets")
+    assert conn.list_all.call_args[0][0] == "/api/networking/v4.0/config/subnets"
 
 
 @pytest.mark.unit

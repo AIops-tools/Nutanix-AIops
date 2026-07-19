@@ -33,8 +33,8 @@ def test_list_clusters_normalizes_nested_config_and_nodes():
             "nodes": {"numberOfNodes": 4},
         }
     ]
-    rows = ops.list_clusters(conn)
-    conn.list_all.assert_called_once_with(_CLUSTERS)
+    rows = ops.list_clusters(conn)["clusters"]
+    assert conn.list_all.call_args[0][0] == _CLUSTERS
     assert rows == [
         {
             "extId": "cl-1",
@@ -51,8 +51,9 @@ def test_list_clusters_normalizes_nested_config_and_nodes():
 def test_list_clusters_tolerates_missing_config_blocks():
     conn = MagicMock(name="conn")
     conn.list_all.return_value = [{"extId": "cl-2", "name": "bare"}]
-    (row,) = ops.list_clusters(conn)
-    assert row["aosVersion"] == ""
+    (row,) = ops.list_clusters(conn)["clusters"]
+    # absent != empty: the API omitted aosVersion, so it reports null, not ""
+    assert row["aosVersion"] is None
     assert row["hypervisorTypes"] == []
     assert row["nodeCount"] is None
     assert row["clusterFunction"] == []
@@ -101,14 +102,15 @@ def test_list_hosts_normalizes_nested_references():
             "bootTimeUsecs": 111,
         }
     ]
-    rows = ops.list_hosts(conn)
-    conn.list_all.assert_called_once_with(_HOSTS)
+    rows = ops.list_hosts(conn)["hosts"]
+    assert conn.list_all.call_args[0][0] == _HOSTS
     assert rows == [
         {
             "extId": "h-1",
             "name": "node-a",
             "clusterExtId": "cl-1",
             "hypervisor": "AHV",
+            "nodeStatus": None,
             "numCpuCores": 32,
             "memoryBytes": 137438953472,
             "bootTimeUsecs": 111,

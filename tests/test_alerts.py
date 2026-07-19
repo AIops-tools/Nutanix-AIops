@@ -22,7 +22,7 @@ def test_list_alerts_normalizes_and_applies_severity_filter():
          "impactType": "Availability", "creationTime": "t0", "acknowledged": False,
          "resolved": False, "affectedEntityExtId": "host-9"},
     ]
-    rows = ops.list_alerts(conn, severity="CRITICAL")
+    rows = ops.list_alerts(conn, severity="CRITICAL")["alerts"]
 
     assert rows[0]["extId"] == "a1"
     assert rows[0]["severity"] == "CRITICAL"
@@ -54,8 +54,8 @@ def test_acknowledge_alert_captures_prior_state_and_posts_with_etag():
 def test_write_tools_have_correct_risk_tiers():
     from mcp_server.tools import alerts as a
 
-    assert a.alert_acknowledge._risk_level == "low"
-    assert a.alert_resolve._risk_level == "low"
+    assert a.alert_acknowledge._risk_level == "medium"
+    assert a.alert_resolve._risk_level == "medium"
     assert a.alert_list._risk_level == "low"
     assert a.analyze_alert._risk_level == "low"
 

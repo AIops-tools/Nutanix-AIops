@@ -6,6 +6,7 @@ import typer
 
 from nutanix_aiops.cli._common import cli_errors
 from nutanix_aiops.cli.cluster import cluster_app
+from nutanix_aiops.cli.diagnostics import diagnose_app
 from nutanix_aiops.cli.doctor import doctor_cmd
 from nutanix_aiops.cli.init import init_cmd
 from nutanix_aiops.cli.overview import overview_cmd
@@ -22,6 +23,7 @@ app = typer.Typer(
 
 app.add_typer(cluster_app, name="cluster")
 app.add_typer(vm_app, name="vm")
+app.add_typer(diagnose_app, name="diagnose")
 app.add_typer(secret_app, name="secret")
 app.add_typer(undo_app, name="undo")
 app.command("init")(init_cmd)

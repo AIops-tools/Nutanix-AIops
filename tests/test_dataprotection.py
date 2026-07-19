@@ -19,12 +19,12 @@ def test_list_recovery_points_normalizes():
         {"extId": "rp1", "vmExtId": "v1", "createTimeUsecs": 111,
          "expirationTimeUsecs": 222, "locationType": "LOCAL"},
     ]
-    rows = ops.list_recovery_points(conn)
+    rows = ops.list_recovery_points(conn)["recoveryPoints"]
     assert rows == [
         {"extId": "rp1", "vmExtId": "v1", "createTimeUsecs": 111,
          "expirationTimeUsecs": 222, "locationType": "LOCAL"},
     ]
-    conn.list_all.assert_called_once_with("/api/dataprotection/v4.0/config/recovery-points")
+    assert conn.list_all.call_args[0][0] == "/api/dataprotection/v4.0/config/recovery-points"
 
 
 @pytest.mark.unit
@@ -49,7 +49,7 @@ def test_create_snapshot_posts_to_vm_snapshots_path_with_etag():
 def test_write_tools_have_correct_risk_tiers():
     from mcp_server.tools import dataprotection as d
 
-    assert d.snapshot_create._risk_level == "low"
+    assert d.snapshot_create._risk_level == "medium"
     assert d.vm_protect._risk_level == "medium"
     assert d.snapshot_delete._risk_level == "high"
     assert d.snapshot_restore._risk_level == "high"

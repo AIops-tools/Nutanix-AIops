@@ -36,13 +36,15 @@ def _update_undo(params: dict[str, Any], result: Any) -> Optional[dict]:
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def storage_container_list(target: Optional[str] = None) -> list:
+def storage_container_list(limit: int = 500, target: Optional[str] = None) -> dict:
     """[READ] List storage containers (extId, name, cluster, capacity, usage, RF).
 
     Args:
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_storage_containers(_get_connection(target))
+    return ops.list_storage_containers(_get_connection(target), limit=limit)
 
 
 # ── writes ───────────────────────────────────────────────────────────────

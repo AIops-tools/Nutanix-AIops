@@ -15,14 +15,18 @@ from nutanix_aiops.ops import capacity as ops
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def task_list(status: Optional[str] = None, target: Optional[str] = None) -> list:
+def task_list(
+    status: Optional[str] = None, limit: int = 500, target: Optional[str] = None
+) -> dict:
     """[READ] List Prism Central tasks (extId, operation, status, %complete, entity).
 
     Args:
         status: Optional status filter, e.g. RUNNING / SUCCEEDED / FAILED.
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_tasks(_get_connection(target), status=status)
+    return ops.list_tasks(_get_connection(target), status=status, limit=limit)
 
 
 @mcp.tool()

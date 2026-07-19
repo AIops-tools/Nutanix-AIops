@@ -14,7 +14,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
+from nutanix_aiops.ops._util import (
+    DEFAULT_LIST_LIMIT,
+    _seg,
+    as_obj,
+    envelope,
+    ext_id,
+    fetch_page,
+    opt,
+    s,
+)
 
 _VMS = "/api/vmm/v4.0/ahv/config/vms"
 _RECOVERY_POINTS = "/api/dataprotection/v4.0/config/recovery-points"
@@ -33,45 +42,51 @@ def _norm_snapshot(raw: dict, vm_ext_id: str) -> dict:
     """Fold one raw VM snapshot record into the stable shape."""
     return {
         "extId": ext_id(raw),
-        "name": s(raw.get("name")),
+        "name": opt(raw.get("name")),
         "createTimeUsecs": raw.get("createTimeUsecs"),
         "vmExtId": s(raw.get("vmExtId") or vm_ext_id),
     }
 
 
-def list_snapshots(conn: Any, vm_ext_id: str) -> list[dict]:
-    """[READ] All snapshots for one VM, normalised (auto-paginated)."""
-    return [_norm_snapshot(r, vm_ext_id) for r in conn.list_all(_snapshots_path(vm_ext_id))]
+def list_snapshots(conn: Any, vm_ext_id: str, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] One VM's snapshots, normalised, in a truncation-aware envelope."""
+    raw, truncated = fetch_page(conn, _snapshots_path(vm_ext_id), limit)
+    rows = [_norm_snapshot(r, vm_ext_id) for r in raw]
+    return envelope("snapshots", rows, limit, truncated)
 
 
 def _norm_recovery_point(raw: dict) -> dict:
     """Fold one raw recovery-point record into the stable shape."""
     return {
         "extId": ext_id(raw),
-        "vmExtId": s(raw.get("vmExtId")),
+        "vmExtId": opt(raw.get("vmExtId")),
         "createTimeUsecs": raw.get("createTimeUsecs"),
         "expirationTimeUsecs": raw.get("expirationTimeUsecs"),
-        "locationType": s(raw.get("locationType")),
+        "locationType": opt(raw.get("locationType")),
     }
 
 
-def list_recovery_points(conn: Any) -> list[dict]:
-    """[READ] All recovery points, normalised (auto-paginated)."""
-    return [_norm_recovery_point(r) for r in conn.list_all(_RECOVERY_POINTS)]
+def list_recovery_points(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] Recovery points, normalised, in a truncation-aware envelope."""
+    raw, truncated = fetch_page(conn, _RECOVERY_POINTS, limit)
+    rows = [_norm_recovery_point(r) for r in raw]
+    return envelope("recoveryPoints", rows, limit, truncated)
 
 
 def _norm_protection_domain(raw: dict) -> dict:
     """Fold one raw protection-policy record into the stable PD shape."""
     return {
         "extId": ext_id(raw),
-        "name": s(raw.get("name")),
-        "replicationType": s(raw.get("replicationType")),
+        "name": opt(raw.get("name")),
+        "replicationType": opt(raw.get("replicationType")),
     }
 
 
-def list_protection_domains(conn: Any) -> list[dict]:
-    """[READ] All protection domains / policies, normalised (auto-paginated)."""
-    return [_norm_protection_domain(r) for r in conn.list_all(_PROTECTION_POLICIES)]
+def list_protection_domains(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] Protection domains / policies, normalised, in a truncation envelope."""
+    raw, truncated = fetch_page(conn, _PROTECTION_POLICIES, limit)
+    rows = [_norm_protection_domain(r) for r in raw]
+    return envelope("protectionDomains", rows, limit, truncated)
 
 
 # ── writes ───────────────────────────────────────────────────────────────
@@ -89,7 +104,7 @@ def create_snapshot(conn: Any, vm_ext_id: str, name: str) -> dict:
     resp = as_obj(conn.post(_snapshots_path(vm_ext_id), etag=etag, json={"name": name}))
     snapshot_ext_id = ""
     try:
-        for snap in list_snapshots(conn, vm_ext_id):
+        for snap in list_snapshots(conn, vm_ext_id)["snapshots"]:
             if snap.get("name") == name:
                 snapshot_ext_id = snap.get("extId", "")
                 break
@@ -106,7 +121,7 @@ def delete_snapshot(conn: Any, vm_ext_id: str, snapshot_ext_id: str) -> dict:
     obj = as_obj(raw)
     conn.delete(path, etag=etag)
     return {"action": "delete_snapshot", "vmExtId": s(vm_ext_id), "extId": s(snapshot_ext_id),
-            "priorState": {"name": s(obj.get("name"))}}
+            "priorState": {"name": opt(obj.get("name"))}}
 
 
 def restore_snapshot(conn: Any, vm_ext_id: str, snapshot_ext_id: str) -> dict:
@@ -117,7 +132,7 @@ def restore_snapshot(conn: Any, vm_ext_id: str, snapshot_ext_id: str) -> dict:
                             json={"snapshotExtId": snapshot_ext_id}))
     return {"action": "restore_snapshot", "vmExtId": s(vm_ext_id),
             "snapshotExtId": s(snapshot_ext_id),
-            "priorState": {"powerState": s(obj.get("powerState"))},
+            "priorState": {"powerState": opt(obj.get("powerState"))},
             "taskExtId": ext_id(resp)}
 
 

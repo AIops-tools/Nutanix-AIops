@@ -75,11 +75,14 @@ def tool_errors(shape: str = "dict") -> Callable:
 mcp = FastMCP(
     "nutanix-aiops",
     instructions=(
-        "Nutanix Prism Central (v4) operations (preview): clusters/hosts and "
+        "Nutanix Prism Central (v4) operations: clusters/hosts and "
         "utilization; VM inventory (AHV + ESXi) and lifecycle (power / create / "
         "update / clone / migrate / delete); storage containers; subnets; images "
         "and categories; snapshots / recovery points and protection domains; "
-        "alerts / events (list, acknowledge, resolve, analyze); and LCM upgrades. "
+        "alerts / events (list, acknowledge, resolve, analyze); LCM upgrades; and "
+        "read-only diagnostics/RCA (cluster_health_rca ranks resiliency, storage "
+        "headroom and downed nodes worst-first; alert_triage_rca groups active "
+        "alerts by severity and surfaces the oldest unresolved). "
         "Mutations auto-handle the v4 ETag/If-Match footgun and auto-paginate. "
         "Destructive writes (delete / migrate / pool changes) are risk=high with a "
         "dry_run preview and require an approver. Every tool runs through the "

@@ -1,58 +1,73 @@
-# Nutanix AIops v0.1.0 — preview
+# Release notes — nutanix-aiops 0.4.0
 
-Governed AI-ops for **Nutanix Prism Central** (v4 REST API) for AI agents, with a
-built-in governance harness (audit, policy, token/runaway budget, undo-token
-recording, graduated risk tiers) and an encrypted credential store. Standalone —
-no external skill-family dependency.
+Previous release: 0.3.0.
 
-> **Preview / mock-only.** All behaviour is validated against mocked v4 REST
-> responses; it has not been run against a live Prism Central. The fastest live
-> check is `nutanix-aiops doctor`.
-
-## Highlights
-
-- **47 MCP tools** (21 read, 26 write), every one wrapped with `@governed_tool`,
-  across nine groups:
-  - **Clusters** (read) — `cluster_list`, `cluster_health`, `host_list`,
-    `cluster_utilization`.
-  - **VMs** — `vm_list` (AHV + ESXi), `vm_get` (surfaces ETag); writes
-    `vm_power_on` / `vm_guest_shutdown` / `vm_power_off` / `vm_reboot` /
-    `vm_create` / `vm_update` (undo prior CPU/mem) / `vm_clone` / `vm_delete`
-    (HIGH, dry-run) / `vm_migrate` (HIGH, dry-run, undo → prior host).
-  - **Storage** — container list / create / update (undo prior) / delete (HIGH).
-  - **Network** — subnet list / get (ETag) / create / delete (HIGH).
-  - **Catalog** — image list / delete (HIGH); category list / create / assign
-    (bulk).
-  - **Data protection / DR** — snapshot list / create / delete (HIGH) / restore
-    (HIGH), `recovery_point_list`, `protection_domain_list`, `vm_protect`,
-    `pd_failover` (HIGH).
-  - **Alerts** — `alert_list`, `event_list`, `audit_list`, **`analyze_alert`**
-    (the flagship RCA read), `alert_acknowledge`, `alert_resolve`.
-  - **LCM** — `lcm_inventory`, `lcm_precheck`, `lcm_update` (HIGH firmware/software).
-  - **Capacity** — `task_list`, `capacity_runway` (days-to-full forecast).
-- **Automatic ETag / If-Match** on every mutation (the v4 footgun) and
-  **automatic pagination** on every list; `vm_list` returns **AHV + ESXi**.
-- **Encrypted password store** (`~/.nutanix-aiops/secrets.enc`, Fernet + scrypt)
-  — never plaintext on disk; legacy `NUTANIX_<TARGET>_PASSWORD` env fallback.
-- **CLI** with an `init` onboarding wizard, `secret` management, `overview`,
-  `cluster` / `vm` sub-commands, and a `doctor` with a REST-RBAC preflight.
-- **Basic-auth REST connection layer** over Prism Central `:9440` with teaching
-  error translation.
-
-## Install
+## Headline: read-only mode
 
 ```bash
-uv tool install nutanix-aiops
-nutanix-aiops init
-nutanix-aiops doctor
+export NUTANIX_READ_ONLY=1
 ```
 
-## Caveats
+With this set the **27 write tools are never registered** — an MCP
+client lists **24 tools instead of 51**. The writes are not hidden
+behind a flag and not merely refused on call: they are absent from the session,
+so a model cannot invoke one and cannot be argued into one. For a reviewer this
+is checkable rather than promised — connect, list the tools, and the writes are
+not there.
 
-- The Prism Central account needs **REST API** rights, not just Web UI access.
-- Self-testable free on **Nutanix Community Edition (CE)** + X-Small Prism
-  Central. The **LCM update**, **PD failover**, and **ESXi-VM listing** paths in
-  particular need live verification.
-- Out of scope this release: IAM / users / roles, Files / Objects / Volumes
-  services, reports, X-Play playbooks, and anything outside Prism Central v4.
-</content>
+Enforcement is two layers deep: the `@governed_tool` harness refuses every
+non-read operation (covering the CLI and in-process callers too), and the MCP
+server removes write tools from `list_tools()`. Changing entry point does not
+get around it.
+
+### Security fix included in this release
+
+6 tool(s) documented as writes were carrying `risk_level="low"`:
+`vm_power_on`, `snapshot_create`, `alert_acknowledge`, `alert_resolve`, `category_create`, `lcm_precheck`.
+
+Because the read/write split keys off `risk_level`, read-only mode would have
+left them **exposed and able to execute real writes**. They are now `medium`,
+and a new test asserts `risk_level` can never again disagree with a tool's own
+`[READ]`/`[WRITE]` documentation.
+
+## BREAKING — return shapes changed
+
+This release changes payloads that callers may be parsing. The first three exist
+to stop a result from misrepresenting itself; the fourth is additive:
+
+1. **Absent fields are now `null`, not `""`.** A missing value and an empty value
+   were previously indistinguishable, which invited consumers to invent the
+   difference. Keys are still always present — only the value may be null.
+2. **Anything with a `limit` now returns an envelope** —
+   `{"<items>": [...], "returned": N, "limit": L, "truncated": bool}`. Truncation is
+   *measured* (one extra row is fetched), never inferred from the page happening to
+   be full. Where a genuine pre-cap total is knowable it is reported as `total`;
+   where it isn't, `total` is deliberately omitted rather than echoing `returned`.
+3. **`risk_level` changed on some tools** (see above). If your `rules.yaml` matches
+   on risk level, re-check those rules.
+4. **Additive**: the normalized host shape in cluster reads gained a `nodeStatus`
+   field (sourced from `nodeStatus`, falling back to `state`, and `null` when the
+   cluster reports neither). No existing key changed meaning or was removed, but
+   it does alter a previously published normalized shape — noted here rather than
+   left for you to discover, in case you assert on exact key sets.
+
+## New: read-only diagnostics / RCA
+
+Two new read-only analyses — `cluster_health_rca` and `alert_triage_rca` — plus a
+`diagnose` CLI group. Every finding cites the measured number that tripped it
+along with a cause and a concrete action, ranked worst-first with an explicit
+`rank` field, so priority is stated in the payload rather than implied by list
+order. Transparent heuristics, not a black-box verdict.
+
+## Also in this release
+
+- **`docs/VERIFICATION.md`** — what the mock suite actually guarantees, a live
+  verification checklist, and the criteria for claiming this tool verified.
+- **`skills/nutanix-aiops/references/agent-guardrails.md`** — for driving this tool with a
+  smaller / local model: which guardrails are now enforced for you, and a
+  ready-made system prompt for the rest.
+- Expanded operator playbooks in the skill documentation.
+- The advertised tool count now matches what an MCP client actually lists
+  (it includes `undo_list` / `undo_apply`), and a release gate keeps it honest.
+- The `(preview)` label has been dropped. It never meant unreleased; verification
+  status now lives in `docs/VERIFICATION.md` where it can be specific.

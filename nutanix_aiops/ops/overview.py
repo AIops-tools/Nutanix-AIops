@@ -23,19 +23,29 @@ def _spread(rows: list[dict], key: str) -> dict[str, int]:
 
 
 def fleet_overview(conn: Any) -> dict:
-    """[READ] Estate summary: cluster/host/VM counts + hypervisor & power spread."""
+    """[READ] Estate summary: cluster/host/VM counts + hypervisor & power spread.
+
+    ``truncated`` names any inventory that hit its row cap, so the counts are
+    never silently understated.
+    """
     errors: list[str] = []
 
-    def _safe(fn: Any, label: str) -> list[dict]:
+    truncated: list[str] = []
+
+    def _safe(fn: Any, label: str, key: str) -> list[dict]:
+        """Call a list op, unwrap its envelope, and note if it was truncated."""
         try:
-            return fn(conn)
+            result = fn(conn)
         except Exception as exc:  # noqa: BLE001 — collect, keep going
             errors.append(f"{label}: {str(exc)[:120]}")
             return []
+        if result.get("truncated"):
+            truncated.append(label)
+        return result.get(key, [])
 
-    clusters = _safe(cl.list_clusters, "clusters")
-    hosts = _safe(cl.list_hosts, "hosts")
-    vm_rows = _safe(vm.list_vms, "vms")
+    clusters = _safe(cl.list_clusters, "clusters", "clusters")
+    hosts = _safe(cl.list_hosts, "hosts", "hosts")
+    vm_rows = _safe(vm.list_vms, "vms", "vms")
 
     return {
         "clusters": len(clusters),
@@ -43,5 +53,6 @@ def fleet_overview(conn: Any) -> dict:
         "vms": len(vm_rows),
         "hypervisorSpread": _spread(vm_rows, "hypervisor"),
         "powerStateSpread": _spread(vm_rows, "powerState"),
+        "truncated": truncated,
         "errors": errors,
     }

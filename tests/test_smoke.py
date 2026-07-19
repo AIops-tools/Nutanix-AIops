@@ -39,6 +39,8 @@ EXPECTED_TOOLS = {
     "lcm_inventory", "lcm_precheck", "lcm_update",
     # capacity
     "task_list", "capacity_runway",
+    # diagnostics / RCA
+    "cluster_health_rca", "alert_triage_rca",
 }
 
 
@@ -53,6 +55,7 @@ def test_all_modules_import():
         "nutanix_aiops.ops.clusters",
         "nutanix_aiops.ops.vms",
         "nutanix_aiops.ops.overview",
+        "nutanix_aiops.ops.diagnostics",
         "nutanix_aiops.cli",
         "nutanix_aiops.cli._root",
         "nutanix_aiops.cli._common",
@@ -62,10 +65,12 @@ def test_all_modules_import():
         "nutanix_aiops.cli.vm",
         "nutanix_aiops.cli.overview",
         "nutanix_aiops.cli.doctor",
+        "nutanix_aiops.cli.diagnostics",
         "mcp_server.server",
         "mcp_server._shared",
         "mcp_server.tools.clusters",
         "mcp_server.tools.vms",
+        "mcp_server.tools.diagnostics",
     ):
         importlib.import_module(name)
 
@@ -91,7 +96,7 @@ def test_cli_app_builds_and_help_works():
     runner = CliRunner()
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    for sub in ("cluster", "vm", "secret", "init", "overview", "doctor", "mcp"):
+    for sub in ("cluster", "vm", "diagnose", "secret", "init", "overview", "doctor", "mcp"):
         assert sub in result.output
 
 
@@ -108,6 +113,8 @@ def test_cli_leaf_help_triggers_lazy_imports():
         ["vm", "list", "--help"], ["vm", "get", "--help"], ["vm", "power", "--help"],
         ["vm", "delete", "--help"], ["vm", "migrate", "--help"],
         ["secret", "list", "--help"], ["secret", "set", "--help"],
+        ["diagnose", "--help"],
+        ["diagnose", "cluster-health", "--help"], ["diagnose", "alert-triage", "--help"],
     ):
         result = runner.invoke(app, cmd)
         assert result.exit_code == 0, f"{cmd} failed: {result.output}"
@@ -128,6 +135,9 @@ def test_every_mcp_tool_is_governed_by_harness():
 
     tool_objs = _shared.mcp._tool_manager._tools
     assert EXPECTED_TOOLS <= set(tool_objs), "tool registry incomplete"
+    assert len(tool_objs) == 51, (
+        "tool count changed — update README/SKILL/server.json too"
+    )
     for name, tool in tool_objs.items():
         fn = getattr(tool, "fn", None)
         assert fn is not None, f"{name} has no fn"
@@ -140,7 +150,7 @@ def test_every_mcp_tool_is_governed_by_harness():
 def test_write_tools_have_correct_risk_tiers():
     from mcp_server.tools import vms as v
 
-    assert v.vm_power_on._risk_level == "low"
+    assert v.vm_power_on._risk_level == "medium"
     assert v.vm_power_off._risk_level == "medium"
     assert v.vm_delete._risk_level == "high"
     assert v.vm_migrate._risk_level == "high"

@@ -18,7 +18,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
+from nutanix_aiops.ops._util import (
+    DEFAULT_LIST_LIMIT,
+    _seg,
+    as_obj,
+    envelope,
+    ext_id,
+    fetch_page,
+    opt,
+    s,
+)
 
 _TASKS = "/api/prism/v4.0/config/tasks"
 _CLUSTERS = "/api/clustermgmt/v4.0/config/clusters"
@@ -28,23 +37,27 @@ def _norm_task(raw: dict) -> dict:
     """Fold one raw task record into the stable shape."""
     return {
         "extId": ext_id(raw),
-        "operation": s(raw.get("operation") or raw.get("operationType")),
-        "status": s(raw.get("status")),
+        "operation": opt(raw.get("operation") or raw.get("operationType")),
+        "status": opt(raw.get("status")),
         "percentageComplete": raw.get("percentageComplete"),
-        "createdTime": s(raw.get("createdTime")),
-        "entityExtId": s((raw.get("entitiesAffected") or [{}])[0].get("extId")
+        "createdTime": opt(raw.get("createdTime")),
+        "entityExtId": opt((raw.get("entitiesAffected") or [{}])[0].get("extId")
                          if raw.get("entitiesAffected") else raw.get("entityExtId")),
     }
 
 
-def list_tasks(conn: Any, status: str | None = None) -> list[dict]:
-    """[READ] All tasks, normalised (auto-paginated); optionally filter by status.
+def list_tasks(
+    conn: Any, status: str | None = None, limit: int = DEFAULT_LIST_LIMIT
+) -> dict:
+    """[READ] Tasks, normalised (auto-paginated); optionally filter by status.
 
     ``status`` (e.g. ``RUNNING`` / ``SUCCEEDED`` / ``FAILED``) becomes a v4
     ``$filter`` so the server does the narrowing rather than the client.
+    Returns a ``{"tasks": [...], "returned", "limit", "truncated"}`` envelope.
     """
     params = {"$filter": f"status eq '{status}'"} if status else None
-    return [_norm_task(r) for r in conn.list_all(_TASKS, params=params)]
+    raw, truncated = fetch_page(conn, _TASKS, limit, params=params)
+    return envelope("tasks", [_norm_task(r) for r in raw], limit, truncated)
 
 
 def get_capacity_runway(

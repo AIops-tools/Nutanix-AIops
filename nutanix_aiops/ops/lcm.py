@@ -12,7 +12,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import as_obj, ext_id, s
+from nutanix_aiops.ops._util import (
+    DEFAULT_LIST_LIMIT,
+    as_obj,
+    envelope,
+    ext_id,
+    fetch_page,
+    opt,
+    s,
+)
 
 _ENTITIES = "/api/lifecycle/v4.0/resources/entities"
 _PRECHECK = "/api/lifecycle/v4.0/resources/$actions/perform-precheck"
@@ -21,21 +29,22 @@ _UPDATE = "/api/lifecycle/v4.0/resources/$actions/perform-update"
 
 def _norm_entity(raw: dict) -> dict:
     """Fold one raw LCM entity record into the stable inventory shape."""
-    current = s(raw.get("currentVersion"))
-    available = s(raw.get("availableVersion"))
+    current = opt(raw.get("currentVersion"))
+    available = opt(raw.get("availableVersion"))
     return {
         "extId": ext_id(raw),
-        "entityClass": s(raw.get("entityClass")),
-        "entityModel": s(raw.get("entityModel")),
+        "entityClass": opt(raw.get("entityClass")),
+        "entityModel": opt(raw.get("entityModel")),
         "currentVersion": current,
         "availableVersion": available,
         "updateAvailable": bool(available) and available != current,
     }
 
 
-def list_lcm_inventory(conn: Any) -> list[dict]:
-    """[READ] All LCM-managed entities and their upgrade availability (auto-paginated)."""
-    return [_norm_entity(r) for r in conn.list_all(_ENTITIES)]
+def list_lcm_inventory(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] LCM-managed entities + upgrade availability, in a truncation envelope."""
+    raw, truncated = fetch_page(conn, _ENTITIES, limit)
+    return envelope("entities", [_norm_entity(r) for r in raw], limit, truncated)
 
 
 def _update_specs(entity_ext_ids: list[str]) -> list[dict]:

@@ -15,7 +15,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
+from nutanix_aiops.ops._util import (
+    DEFAULT_LIST_LIMIT,
+    _seg,
+    as_obj,
+    envelope,
+    ext_id,
+    fetch_page,
+    opt,
+    s,
+)
 
 _ALERTS = "/api/monitoring/v4.0/serviceability/alerts"
 _EVENTS = "/api/monitoring/v4.0/serviceability/events"
@@ -26,13 +35,13 @@ def _norm_alert(raw: dict) -> dict:
     """Fold one raw alert record into the stable shape."""
     return {
         "extId": ext_id(raw),
-        "title": s(raw.get("title")),
-        "severity": s(raw.get("severity")),
-        "impactType": s(raw.get("impactType")),
-        "creationTime": s(raw.get("creationTime")),
+        "title": opt(raw.get("title")),
+        "severity": opt(raw.get("severity")),
+        "impactType": opt(raw.get("impactType")),
+        "creationTime": opt(raw.get("creationTime")),
         "acknowledged": raw.get("acknowledged"),
         "resolved": raw.get("resolved"),
-        "affectedEntityExtId": s(raw.get("affectedEntityExtId")),
+        "affectedEntityExtId": opt(raw.get("affectedEntityExtId")),
     }
 
 
@@ -40,9 +49,9 @@ def _norm_event(raw: dict) -> dict:
     """Fold one raw event record into the stable shape."""
     return {
         "extId": ext_id(raw),
-        "title": s(raw.get("title")),
-        "creationTime": s(raw.get("creationTime")),
-        "sourceEntityExtId": s(raw.get("sourceEntityExtId")),
+        "title": opt(raw.get("title")),
+        "creationTime": opt(raw.get("creationTime")),
+        "sourceEntityExtId": opt(raw.get("sourceEntityExtId")),
     }
 
 
@@ -50,26 +59,35 @@ def _norm_audit(raw: dict) -> dict:
     """Fold one raw audit record into the stable shape."""
     return {
         "extId": ext_id(raw),
-        "operationType": s(raw.get("operationType")),
-        "user": s(raw.get("user")),
-        "creationTime": s(raw.get("creationTime")),
+        "operationType": opt(raw.get("operationType")),
+        "user": opt(raw.get("user")),
+        "creationTime": opt(raw.get("creationTime")),
     }
 
 
-def list_alerts(conn: Any, severity: str | None = None) -> list[dict]:
-    """[READ] All alerts, normalised (auto-paginated); optional severity filter."""
+def list_alerts(
+    conn: Any, severity: str | None = None, limit: int = DEFAULT_LIST_LIMIT
+) -> dict:
+    """[READ] Alerts, normalised (auto-paginated); optional severity filter.
+
+    Returns a ``{"alerts": [...], "returned": N, "limit": L, "truncated": bool}``
+    envelope so a capped read announces itself.
+    """
     params = {"$filter": f"severity eq '{severity}'"} if severity else None
-    return [_norm_alert(r) for r in conn.list_all(_ALERTS, params=params)]
+    raw, truncated = fetch_page(conn, _ALERTS, limit, params=params)
+    return envelope("alerts", [_norm_alert(r) for r in raw], limit, truncated)
 
 
-def list_events(conn: Any) -> list[dict]:
-    """[READ] All events, normalised (auto-paginated)."""
-    return [_norm_event(r) for r in conn.list_all(_EVENTS)]
+def list_events(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] Events, normalised (auto-paginated), in a truncation-aware envelope."""
+    raw, truncated = fetch_page(conn, _EVENTS, limit)
+    return envelope("events", [_norm_event(r) for r in raw], limit, truncated)
 
 
-def list_audits(conn: Any) -> list[dict]:
-    """[READ] All config audit records, normalised (auto-paginated)."""
-    return [_norm_audit(r) for r in conn.list_all(_AUDITS)]
+def list_audits(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] Config audit records, normalised, in a truncation-aware envelope."""
+    raw, truncated = fetch_page(conn, _AUDITS, limit)
+    return envelope("audits", [_norm_audit(r) for r in raw], limit, truncated)
 
 
 def acknowledge_alert(conn: Any, alert_ext_id: str) -> dict:
@@ -92,7 +110,7 @@ def resolve_alert(conn: Any, alert_ext_id: str) -> dict:
             "priorState": {"resolved": prior}}
 
 
-def _probable_cause(severity: str, impact_type: str) -> str:
+def _probable_cause(severity: str | None, impact_type: str | None) -> str:
     """Deterministic root-cause heuristic from severity + impactType (no clock/random)."""
     impact = (impact_type or "").lower()
     sev = (severity or "").lower()
@@ -115,7 +133,7 @@ def _probable_cause(severity: str, impact_type: str) -> str:
             "localise the root cause on the affected entity.")
 
 
-def _suggested_actions(severity: str, impact_type: str) -> list[str]:
+def _suggested_actions(severity: str | None, impact_type: str | None) -> list[str]:
     """Deterministic remediation hints from severity + impactType."""
     impact = (impact_type or "").lower()
     actions = ["Review the related events below for the earliest matching event."]
@@ -145,7 +163,7 @@ def analyze_alert(conn: Any, alert_ext_id: str) -> dict:
         alert = _norm_alert(raw)
         affected = alert["affectedEntityExtId"]
         related = [
-            e for e in list_events(conn)
+            e for e in list_events(conn)["events"]
             if affected and e["sourceEntityExtId"] == affected
         ][:10]
         return {

@@ -19,8 +19,8 @@ def test_image_list_normalizes():
         {"extId": "img-1", "name": "ubuntu.qcow2", "type": "DISK_IMAGE",
          "sizeBytes": 1024, "clusterLocationExtIds": ["c1", "c2"]},
     ]
-    rows = ops.list_images(conn)
-    conn.list_all.assert_called_once_with("/api/vmm/v4.0/content/images")
+    rows = ops.list_images(conn)["images"]
+    assert conn.list_all.call_args[0][0] == "/api/vmm/v4.0/content/images"
     assert rows == [{
         "extId": "img-1", "name": "ubuntu.qcow2", "type": "DISK_IMAGE",
         "sizeBytes": 1024, "clusterExtIds": ["c1", "c2"],
@@ -52,7 +52,7 @@ def test_write_tools_have_correct_risk_tiers():
     from mcp_server.tools import catalog as c
 
     assert c.image_delete._risk_level == "high"
-    assert c.category_create._risk_level == "low"
+    assert c.category_create._risk_level == "medium"
     assert c.category_assign._risk_level == "medium"
 
 

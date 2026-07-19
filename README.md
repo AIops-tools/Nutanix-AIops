@@ -1,6 +1,6 @@
 <!-- mcp-name: io.github.AIops-tools/nutanix-aiops -->
 
-# Nutanix AIops (preview)
+# Nutanix AIops
 
 > **Disclaimer**: Community-maintained open-source project. **Not affiliated with, endorsed by, or sponsored by Nutanix.** Product and trademark names belong to their owners. MIT licensed.
 
@@ -10,22 +10,65 @@ upgrades, and capacity — with a **built-in governance harness**: unified audit
 log, policy engine, token/runaway budget guard, undo-token recording, and
 graduated-autonomy risk tiers. Connects to Prism Central on HTTPS `:9440` with
 HTTP Basic auth (username + encrypted password). Self-contained: no dependencies
-beyond `httpx` and the MCP SDK. **Preview — mock-validated only, not yet verified
-against a live Prism Central.**
+beyond `httpx` and the MCP SDK.
 
 ## Why this over a read-only Nutanix MCP
 
 - **Automatic ETag / If-Match** on every mutation. The v4 API rejects an update
   or delete without the entity's current ETag — the classic footgun. This tool
   fetches and sends `If-Match` for you.
-- **Automatic pagination** — list tools return the full set, not just page one.
+- **Automatic pagination** — list tools walk every v4 page for you, and return a
+  `{"<items>": [...], "returned", "limit", "truncated"}` envelope so a capped
+  read announces itself instead of looking like the whole estate.
+- **Absent is not empty** — a field Prism Central did not return comes back as
+  `null`, never as `""`. v4 omits a lot of fields; the two facts stay distinct.
 - **Mixed-hypervisor VM listing** — `vm_list` returns both **AHV** and **ESXi**
   guests under the same Prism Central (built for hypervisor-migration estates).
 - **Governance harness** — audit / token+call budget / risk-tier approval /
   undo-token / prompt-injection sanitize, with **dry-run + double-confirm** on
   destructive writes.
 
-## Capability matrix (47 MCP tools)
+## Security: read-only mode
+
+This tool is meant to be handed to an AI agent, so its safety story is enforced
+by the server rather than requested in a prompt:
+
+```bash
+export NUTANIX_READ_ONLY=1
+```
+
+With that set, the **27 write tools are never registered**. An MCP client
+lists **24 tools instead of 51** — the writes are not hidden, not
+gated behind a flag, and not merely refused when called. They are absent from
+the session. A model cannot invoke a tool it was never offered, and cannot be
+argued into one.
+
+That distinction is the whole point. A tool that exists but refuses still invites
+retry loops and "I'll describe the call instead" behaviour from smaller models,
+and it leaves a reviewer trusting a promise. An absent tool is a fact you can
+check: connect, list the tools, and see that the writes are not there.
+
+Enforcement is two layers deep, so the switch cannot be sidestepped by changing
+entry point:
+
+| Layer | What it does | Covers |
+|---|---|---|
+| `@governed_tool` harness | refuses every non-read operation outright | MCP, CLI, and in-process callers |
+| MCP registration | write tools are removed from `list_tools()` | anything speaking MCP |
+
+Read operations are unaffected, and every call is still audited to
+`~/.nutanix-aiops/audit.db`.
+
+> The read/write split is derived from each tool's declared `risk_level`, and a
+> test asserts that this never disagrees with the `[READ]`/`[WRITE]` tag in the
+> tool's own documentation — so a write can't quietly present itself as a read.
+
+Running a smaller / local model? See
+[agent-guardrails.md](skills/nutanix-aiops/references/agent-guardrails.md) — it lists
+the guardrails this tool now enforces for you (so you don't spend prompt budget
+restating them) and gives a ready-made system prompt for what's left.
+
+## Capability matrix (51 MCP tools)
 
 | Group | Tools | Count | R/W |
 |-------|-------|:-----:|:---:|
@@ -38,9 +81,19 @@ against a live Prism Central.**
 | **Alerts** | `alert_list`, `event_list`, `audit_list`, `analyze_alert` (RCA), `alert_acknowledge`, `alert_resolve` | 6 | 4 read · 2 write |
 | **LCM (upgrades)** | `lcm_inventory`, `lcm_precheck`, `lcm_update` | 3 | 1 read · 2 write |
 | **Capacity** | `task_list`, `capacity_runway` | 2 | 2 read |
-| **Total** | | **47** | 21 read · 26 write |
+| **Diagnostics / RCA** | `cluster_health_rca`, `alert_triage_rca` | 2 | 2 read |
+| **Undo** | `undo_list`, `undo_apply` | 2 | 1 read · 1 write |
+| **Total** | | **51** | 24 read · 27 write |
 
-`analyze_alert` is the flagship read: it correlates an alert with its related
+**Diagnostics / RCA** are the flagship reads. `cluster_health_rca` ranks the whole
+estate — degraded fault-tolerance state, storage pools and containers over 80%
+(warning) / 90% (critical), nodes not healthy or missing from inventory —
+worst-first, each finding citing the measured percentage or raw Prism state that
+tripped it. `alert_triage_rca` groups active alerts by severity with a count per
+level, flags unacknowledged criticals, and surfaces the oldest unresolved alert
+with its age. Both are read-only (`risk_level="low"`) and deterministic — no
+clock, no randomness, same input → same answer. `analyze_alert` complements them
+at the single-alert level: it correlates an alert with its related
 events into a probable-cause + suggested-actions summary. High-risk writes
 (`vm_delete`, `vm_migrate`, `storage_container_delete`, `subnet_delete`,
 `snapshot_delete`, `snapshot_restore`, `pd_failover`, `image_delete`,
@@ -58,6 +111,7 @@ uv tool install nutanix-aiops          # or: pipx install nutanix-aiops
 nutanix-aiops init                     # wizard: PC host / port 9440 / username / verify_ssl + encrypted password
 nutanix-aiops doctor                   # config, secrets, connectivity + REST-RBAC preflight
 nutanix-aiops overview                 # one-shot estate summary
+nutanix-aiops diagnose cluster-health  # worst-first RCA: resiliency, storage, nodes
 nutanix-aiops vm list                  # AHV + ESXi VMs
 ```
 
@@ -72,8 +126,9 @@ nutanix-aiops mcp
 
 `nutanix-aiops` (Typer): `init`, `overview`, `doctor`, `mcp`; `cluster
 list/health/hosts/util`; `vm list/get/power/delete/migrate` (`delete` & `migrate`
-take `--dry-run` + double confirm); `secret set/list/rm/migrate/rotate-password`.
-The CLI is a convenience subset — the full 47-tool surface is via the MCP server.
+take `--dry-run` + double confirm); `diagnose cluster-health`, `diagnose
+alert-triage`; `secret set/list/rm/migrate/rotate-password`.
+The CLI is a convenience subset — the full 51-tool surface is via the MCP server.
 
 ## Governance
 
@@ -102,9 +157,11 @@ env var `NUTANIX_<TARGET>_PASSWORD` is honoured as a fallback.
 
 ## Supported scope & limitations
 
-- **Preview / mock-only.** All behaviour is validated against mocked v4 REST
-  responses; it has not been run against a live Prism Central. The fastest live
-  check is `nutanix-aiops doctor`.
+- **Validation status.** All behaviour is currently validated against mocked v4
+  REST responses; it has not yet been run against a live Prism Central. The
+  fastest live check is `nutanix-aiops doctor`. See
+  [`docs/VERIFICATION.md`](docs/VERIFICATION.md) for the full live-verification
+  checklist.
 - **Self-testable free** on **Nutanix Community Edition (CE)**: a single-node CE
   cluster + an X-Small Prism Central VM.
 - **Least-verified paths:** LCM update (`lcm_update`), protection-domain failover

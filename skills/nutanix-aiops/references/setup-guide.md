@@ -1,6 +1,7 @@
 # nutanix-aiops setup & security guide
 
-> Preview / mock-only — not yet validated against a live Prism Central.
+> Currently validated against mocked v4 REST responses; see `docs/VERIFICATION.md`
+> in the repo for the live-verification checklist.
 
 ## 1. Install
 

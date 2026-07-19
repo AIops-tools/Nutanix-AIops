@@ -70,8 +70,8 @@ def test_list_categories_normalizes():
     conn.list_all.return_value = [
         {"extId": "cat-1", "key": "Env", "value": "Prod", "description": "d"},
     ]
-    rows = ops.list_categories(conn)
-    conn.list_all.assert_called_once_with("/api/prism/v4.0/config/categories")
+    rows = ops.list_categories(conn)["categories"]
+    assert conn.list_all.call_args[0][0] == "/api/prism/v4.0/config/categories"
     assert rows == [{"extId": "cat-1", "key": "Env", "value": "Prod", "description": "d"}]
 
 
@@ -99,16 +99,16 @@ def test_list_events_and_audits_normalize():
     conn.list_all.return_value = [
         {"extId": "e1", "title": "evt", "creationTime": "t", "sourceEntityExtId": "s1"},
     ]
-    events = ops.list_events(conn)
-    conn.list_all.assert_called_with("/api/monitoring/v4.0/serviceability/events")
+    events = ops.list_events(conn)["events"]
+    assert conn.list_all.call_args[0][0] == "/api/monitoring/v4.0/serviceability/events"
     assert events == [{"extId": "e1", "title": "evt", "creationTime": "t",
                        "sourceEntityExtId": "s1"}]
 
     conn.list_all.return_value = [
         {"extId": "au1", "operationType": "UPDATE", "user": "root", "creationTime": "t"},
     ]
-    audits = ops.list_audits(conn)
-    conn.list_all.assert_called_with("/api/prism/v4.0/config/audits")
+    audits = ops.list_audits(conn)["audits"]
+    assert conn.list_all.call_args[0][0] == "/api/prism/v4.0/config/audits"
     assert audits == [{"extId": "au1", "operationType": "UPDATE", "user": "root",
                        "creationTime": "t"}]
 
@@ -152,14 +152,14 @@ def test_list_snapshots_and_protection_domains_normalize():
     conn.list_all.return_value = [
         {"extId": "snap-1", "name": "nightly", "createTimeUsecs": 5, "vmExtId": "v1"},
     ]
-    snaps = ops.list_snapshots(conn, "v1")
-    conn.list_all.assert_called_with("/api/vmm/v4.0/ahv/config/vms/v1/snapshots")
+    snaps = ops.list_snapshots(conn, "v1")["snapshots"]
+    assert conn.list_all.call_args[0][0] == "/api/vmm/v4.0/ahv/config/vms/v1/snapshots"
     assert snaps == [{"extId": "snap-1", "name": "nightly", "createTimeUsecs": 5,
                       "vmExtId": "v1"}]
 
     conn.list_all.return_value = [{"extId": "pd-1", "name": "gold", "replicationType": "ASYNC"}]
-    pds = ops.list_protection_domains(conn)
-    conn.list_all.assert_called_with("/api/dataprotection/v4.0/config/protection-policies")
+    pds = ops.list_protection_domains(conn)["protectionDomains"]
+    assert conn.list_all.call_args[0][0] == "/api/dataprotection/v4.0/config/protection-policies"
     assert pds == [{"extId": "pd-1", "name": "gold", "replicationType": "ASYNC"}]
 
 
@@ -260,7 +260,7 @@ def test_norm_subnet_falls_back_to_ipv6_block():
         "extId": "sn6", "name": "v6net", "subnetType": "VLAN",
         "ipConfig": [{"ipv6": {"ipSubnet": {"ip": {"value": "fd00::"}, "prefixLength": 64}}}],
     }]
-    (row,) = ops.list_subnets(conn)
+    (row,) = ops.list_subnets(conn)["subnets"]
     assert row["ipConfig"]["cidr"] == "fd00::/64"
 
 

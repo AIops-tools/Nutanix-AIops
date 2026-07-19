@@ -12,7 +12,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
+from nutanix_aiops.ops._util import (
+    DEFAULT_LIST_LIMIT,
+    _seg,
+    as_obj,
+    envelope,
+    ext_id,
+    fetch_page,
+    opt,
+    s,
+)
 
 _CONTAINERS = "/api/clustermgmt/v4.0/config/storage-containers"
 
@@ -21,17 +30,18 @@ def _norm_container(raw: dict) -> dict:
     """Fold one raw storage-container record into the stable inventory shape."""
     return {
         "extId": ext_id(raw),
-        "name": s(raw.get("name")),
-        "clusterExtId": s(raw.get("clusterExtId") or (raw.get("cluster") or {}).get("extId")),
+        "name": opt(raw.get("name")),
+        "clusterExtId": opt(raw.get("clusterExtId") or (raw.get("cluster") or {}).get("extId")),
         "maxCapacityBytes": raw.get("maxCapacityBytes"),
         "logicalUsageBytes": raw.get("logicalUsageBytes"),
         "replicationFactor": raw.get("replicationFactor"),
     }
 
 
-def list_storage_containers(conn: Any) -> list[dict]:
-    """[READ] All storage containers, normalised (auto-paginated)."""
-    return [_norm_container(r) for r in conn.list_all(_CONTAINERS)]
+def list_storage_containers(conn: Any, limit: int = DEFAULT_LIST_LIMIT) -> dict:
+    """[READ] Storage containers, normalised, in a truncation-aware envelope."""
+    raw, truncated = fetch_page(conn, _CONTAINERS, limit)
+    return envelope("containers", [_norm_container(r) for r in raw], limit, truncated)
 
 
 def _container_raw(conn: Any, ext_id_: str) -> tuple[dict, str]:
@@ -85,7 +95,7 @@ def update_storage_container(
     return {
         "action": "update_storage_container",
         "extId": s(ext_id),
-        "name": s(obj.get("name")),
+        "name": opt(obj.get("name")),
         "priorState": prior,
     }
 
@@ -97,7 +107,7 @@ def delete_storage_container(conn: Any, ext_id: str) -> dict:
     return {
         "action": "delete_storage_container",
         "extId": s(ext_id),
-        "name": s(obj.get("name")),
+        "name": opt(obj.get("name")),
         "priorState": {
             "maxCapacityBytes": obj.get("maxCapacityBytes"),
             "replicationFactor": obj.get("replicationFactor"),

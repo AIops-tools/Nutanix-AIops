@@ -15,7 +15,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from nutanix_aiops.ops._util import _seg, as_obj, ext_id, s
+from nutanix_aiops.ops._util import (
+    DEFAULT_LIST_LIMIT,
+    _seg,
+    as_obj,
+    envelope,
+    ext_id,
+    fetch_page,
+    opt,
+    s,
+)
 
 _VMS = "/api/vmm/v4.0/ahv/config/vms"
 
@@ -34,27 +43,32 @@ def _norm_vm(raw: dict) -> dict:
     hypervisor = raw.get("hypervisorType") or (raw.get("source") or {}).get("entityType") or "AHV"
     return {
         "extId": ext_id(raw),
-        "name": s(raw.get("name")),
-        "powerState": s(raw.get("powerState")),
+        "name": opt(raw.get("name")),
+        "powerState": opt(raw.get("powerState")),
         "hypervisor": s(hypervisor),
         "numSockets": raw.get("numSockets"),
         "numCoresPerSocket": raw.get("numCoresPerSocket"),
         "memoryBytes": raw.get("memorySizeBytes"),
-        "clusterExtId": s(cluster.get("extId")),
-        "hostExtId": s(host.get("extId")),
+        "clusterExtId": opt(cluster.get("extId")),
+        "hostExtId": opt(host.get("extId")),
         "ipAddresses": ips,
     }
 
 
-def list_vms(conn: Any, include_esxi: bool = True) -> list[dict]:
-    """[READ] All VMs (AHV + ESXi), normalised (auto-paginated).
+def list_vms(
+    conn: Any, include_esxi: bool = True, limit: int = DEFAULT_LIST_LIMIT
+) -> dict:
+    """[READ] VMs (AHV + ESXi), normalised, in a truncation-aware envelope.
 
-    Set ``include_esxi=False`` to return only AHV-native VMs.
+    Set ``include_esxi=False`` to return only AHV-native VMs. Note the ESXi
+    filter is applied *after* the page is fetched, so ``returned`` can be lower
+    than ``limit`` while ``truncated`` is still true.
     """
-    rows = [_norm_vm(r) for r in conn.list_all(_VMS)]
-    if include_esxi:
-        return rows
-    return [r for r in rows if r["hypervisor"].upper() == "AHV"]
+    raw, truncated = fetch_page(conn, _VMS, limit)
+    rows = [_norm_vm(r) for r in raw]
+    if not include_esxi:
+        rows = [r for r in rows if (r["hypervisor"] or "").upper() == "AHV"]
+    return envelope("vms", rows, limit, truncated)
 
 
 def get_vm(conn: Any, vm_ext_id: str) -> dict:
@@ -68,7 +82,7 @@ def get_vm(conn: Any, vm_ext_id: str) -> dict:
     if not obj:
         raise KeyError(f"VM '{vm_ext_id}' not found.")
     result = _norm_vm(obj)
-    result["_etag"] = s(etag)
+    result["_etag"] = opt(etag)
     return result
 
 
@@ -84,12 +98,12 @@ def _vm_raw(conn: Any, vm_ext_id: str) -> tuple[dict, str]:
 def _power_action(conn: Any, vm_ext_id: str, action: str) -> dict:
     """Run a power ``$action`` with the VM's current ETag, capturing prior power state."""
     obj, etag = _vm_raw(conn, vm_ext_id)
-    prior = s(obj.get("powerState"))
+    prior = opt(obj.get("powerState"))
     conn.post(f"{_VMS}/{_seg(vm_ext_id)}/$actions/{action}", etag=etag, json={})
     return {
         "action": action,
         "extId": s(vm_ext_id),
-        "name": s(obj.get("name")),
+        "name": opt(obj.get("name")),
         "priorState": {"powerState": prior},
     }
 
@@ -149,7 +163,7 @@ def update_vm(
     if memory_bytes is not None:
         body["memorySizeBytes"] = memory_bytes
     conn.put(f"{_VMS}/{_seg(vm_ext_id)}", etag=etag, json=body)
-    return {"action": "update_vm", "extId": s(vm_ext_id), "name": s(obj.get("name")),
+    return {"action": "update_vm", "extId": s(vm_ext_id), "name": opt(obj.get("name")),
             "priorState": prior}
 
 
@@ -166,19 +180,19 @@ def delete_vm(conn: Any, vm_ext_id: str) -> dict:
     """[WRITE][high] Delete a VM — captures the prior name/power state for the audit trail."""
     obj, etag = _vm_raw(conn, vm_ext_id)
     conn.delete(f"{_VMS}/{_seg(vm_ext_id)}", etag=etag)
-    return {"action": "delete_vm", "extId": s(vm_ext_id), "name": s(obj.get("name")),
-            "priorState": {"powerState": s(obj.get("powerState"))}}
+    return {"action": "delete_vm", "extId": s(vm_ext_id), "name": opt(obj.get("name")),
+            "priorState": {"powerState": opt(obj.get("powerState"))}}
 
 
 def migrate_vm(conn: Any, vm_ext_id: str, target_host_ext_id: str) -> dict:
     """[WRITE][high] Live-migrate a VM to another host."""
     obj, etag = _vm_raw(conn, vm_ext_id)
-    prior_host = s((obj.get("host") or {}).get("extId"))
+    prior_host = opt((obj.get("host") or {}).get("extId"))
     resp = as_obj(conn.post(
         f"{_VMS}/{_seg(vm_ext_id)}/$actions/migrate",
         etag=etag,
         json={"targetHost": {"extId": target_host_ext_id}},
     ))
-    return {"action": "migrate_vm", "extId": s(vm_ext_id), "name": s(obj.get("name")),
+    return {"action": "migrate_vm", "extId": s(vm_ext_id), "name": opt(obj.get("name")),
             "targetHostExtId": s(target_host_ext_id),
             "priorState": {"hostExtId": prior_host}, "taskExtId": ext_id(resp)}

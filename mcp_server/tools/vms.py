@@ -19,7 +19,7 @@ def _power_undo(params: dict[str, Any], result: Any) -> Optional[dict]:
     """Inverse of a power action: restore the captured prior power state."""
     if not isinstance(result, dict):
         return None
-    prior = (result.get("priorState") or {}).get("powerState", "").upper()
+    prior = ((result.get("priorState") or {}).get("powerState") or "").upper()
     ext = params.get("vm_ext_id")
     if prior == "ON":
         return {"tool": "vm_power_on", "params": {"vm_ext_id": ext},
@@ -65,14 +65,18 @@ def _migrate_undo(params: dict[str, Any], result: Any) -> Optional[dict]:
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def vm_list(include_esxi: bool = True, target: Optional[str] = None) -> list:
+def vm_list(
+    include_esxi: bool = True, limit: int = 500, target: Optional[str] = None
+) -> dict:
     """[READ] List VMs — AHV and (by default) ESXi-backed too; hypervisor field distinguishes.
 
     Args:
         include_esxi: Include ESXi-backed VMs Prism Central can see (default True).
+        limit: Max rows to return (default 500). The result reports
+            `returned`, `limit`, and `truncated` so a capped read is visible.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.list_vms(_get_connection(target), include_esxi=include_esxi)
+    return ops.list_vms(_get_connection(target), include_esxi=include_esxi, limit=limit)
 
 
 @mcp.tool()
@@ -92,10 +96,10 @@ def vm_get(vm_ext_id: str, target: Optional[str] = None) -> dict:
 
 
 @mcp.tool()
-@governed_tool(risk_level="low", undo=_power_undo)
+@governed_tool(risk_level="medium", undo=_power_undo)
 @tool_errors("dict")
 def vm_power_on(vm_ext_id: str, target: Optional[str] = None) -> dict:
-    """[WRITE][risk=low] Power on a VM (reversible → power-off). Auto-handles ETag.
+    """[WRITE][risk=medium] Power on a VM (reversible → power-off). Auto-handles ETag.
 
     Args:
         vm_ext_id: VM extId as returned by vm_list.
