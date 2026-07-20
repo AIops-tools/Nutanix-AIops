@@ -263,7 +263,7 @@ def test_vm_power_on_records_undo_via_harness(monkeypatch):
     recorded = {}
 
     class _Store:
-        def record(self, *, skill, tool, undo_descriptor, orig_params):
+        def record(self, *, skill, tool, undo_descriptor, orig_params, effect_verified=True):
             recorded["descriptor"] = undo_descriptor
             return "undo-1"
 
@@ -307,12 +307,27 @@ def test_mcp_vm_delete_dry_run_does_not_mutate(monkeypatch):
 
 @pytest.mark.unit
 def test_cli_vm_delete_dry_run_gates(monkeypatch):
+    """vm delete --dry-run previews without deleting.
+
+    The invariant is "a dry_run MAY read; it must never write" — this preview
+    reads so it can run the same guards as the real delete. It routes through
+    the governed twin, so the risk=high approver gate applies to it too.
+    """
+    import mcp_server.tools.vms as gov
     from nutanix_aiops.cli import app
 
-    runner = CliRunner()
-    result = runner.invoke(app, ["vm", "delete", "v1", "--dry-run"])
-    assert result.exit_code == 0
+    monkeypatch.setenv("NUTANIX_AUDIT_APPROVED_BY", "tester")
+    conn = MagicMock(name="conn")
+    conn.get_with_etag.return_value = (
+        {"data": {"extId": "v1", "name": "db01", "powerState": "ON"}}, "etag-1",
+    )
+    conn.target.host = "10.0.0.10"
+    monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
+
+    result = CliRunner().invoke(app, ["vm", "delete", "v1", "--dry-run"])
+    assert result.exit_code == 0, result.output
     assert "DRY-RUN" in result.output
+    conn.delete.assert_not_called()  # read yes, write never
 
 
 # ── URL path-segment encoding ───────────────────────────────────────────

@@ -4,9 +4,11 @@ Reads Prism Central's subnet inventory via the networking v4 API and folds it
 into stable shapes so downstream analysis never has to special-case raw payload
 field names. Every mutating call auto-fetches the subnet's current ETag (via
 ``conn.get_with_etag``) and sends it back as ``If-Match`` on the mutation — the
-Prism v4 footgun handled once, here. The destructive delete captures the
-subnet's BEFORE name into ``priorState`` for a faithful audit trail. All server
-text passes through ``sanitize`` at the ``_util`` layer.
+Prism v4 footgun handled once, here. A subnet delete has no inverse, so the
+destructive delete captures the subnet's whole BEFORE shape into ``priorState``
+— name, description, type, VLAN id, cluster and IP config/pools — enough to
+hand-rebuild the subnet from the audit row alone. All server text passes through
+``sanitize`` at the ``_util`` layer.
 """
 
 from __future__ import annotations
@@ -53,6 +55,51 @@ def _norm_subnet(raw: dict) -> dict:
         "clusterExtId": opt(cluster.get("extId") or cluster.get("uuid")
                             or raw.get("clusterExtId")),
         "ipConfig": ip_config,
+    }
+
+
+def _ip_pools(raw: dict) -> list[dict]:
+    """Every IPAM/DHCP pool range on the subnet, as ``{"startIp", "endIp"}`` rows.
+
+    Pools are not part of the inventory shape (they are detail a list view does
+    not need), but they ARE part of what a rebuilt subnet has to reproduce, so
+    the delete's prior state records them.
+    """
+    ipcfg = raw.get("ipConfig") or []
+    entries = ipcfg if isinstance(ipcfg, list) else [ipcfg]
+    pools: list[dict] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        family = entry.get("ipv4") or entry.get("ipv6") or {}
+        for pool in (family.get("poolList") if isinstance(family, dict) else None) or []:
+            if not isinstance(pool, dict):
+                continue
+            start = opt((pool.get("startIp") or {}).get("value"))
+            end = opt((pool.get("endIp") or {}).get("value"))
+            if start or end:
+                pools.append({"startIp": start, "endIp": end})
+    return pools
+
+
+def _prior_state(raw: dict) -> dict:
+    """Everything needed to hand-rebuild a subnet, for the audit trail.
+
+    A delete is irreversible, so ``priorState`` is the only record of what was
+    there. Recording just the name — as this once did — left the VLAN id,
+    cluster and addressing unrecoverable, meaning the change could not be
+    reconstructed even by hand. Every field is optional-safe: a sparse API
+    response yields nulls and empty collections, never a crash.
+    """
+    norm = _norm_subnet(raw)
+    return {
+        "name": norm["name"],
+        "description": opt(raw.get("description")),
+        "subnetType": norm["subnetType"],
+        "vlanId": norm["vlanId"],
+        "clusterExtId": norm["clusterExtId"],
+        "ipConfig": norm["ipConfig"],
+        "ipPools": _ip_pools(raw),
     }
 
 
@@ -106,8 +153,13 @@ def create_subnet(
 
 
 def delete_subnet(conn: Any, ext_id: str) -> dict:
-    """[WRITE][high] Delete a subnet — captures the prior name for the audit trail."""
+    """[WRITE][high] Delete a subnet — captures its full prior state for the audit trail.
+
+    The delete is irreversible, so ``priorState`` carries name, description,
+    type, VLAN id, cluster and IP config/pools: enough to recreate the subnet
+    by hand from the audit row. See :func:`_prior_state`.
+    """
     obj, etag = _subnet_raw(conn, ext_id)
     conn.delete(f"{_SUBNETS}/{_seg(ext_id)}", etag=etag)
     return {"action": "delete_subnet", "extId": s(ext_id),
-            "name": opt(obj.get("name")), "priorState": {"name": opt(obj.get("name"))}}
+            "name": opt(obj.get("name")), "priorState": _prior_state(obj)}

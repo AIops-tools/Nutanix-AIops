@@ -144,10 +144,15 @@ def snapshot_restore(
         dry_run: If True, preview the revert without performing it.
         target: Prism Central target name from config; omit for the default.
     """
+    conn = _get_connection(target)
     if dry_run:
-        return {"dryRun": True, "wouldRevert": {"vmExtId": vm_ext_id,
-                                                "snapshotExtId": snapshot_ext_id}}
-    return ops.restore_snapshot(_get_connection(target), vm_ext_id, snapshot_ext_id)
+        # The preview runs the self-lockout guard too: if the real revert would
+        # be refused, the dry-run must say so rather than report wouldRevert.
+        return {
+            "dryRun": True,
+            "wouldRevert": ops.preview_restore_snapshot(conn, vm_ext_id, snapshot_ext_id),
+        }
+    return ops.restore_snapshot(conn, vm_ext_id, snapshot_ext_id)
 
 
 @mcp.tool()

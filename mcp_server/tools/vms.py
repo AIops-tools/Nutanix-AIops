@@ -221,9 +221,9 @@ def vm_delete(vm_ext_id: str, dry_run: bool = False, target: Optional[str] = Non
     """
     conn = _get_connection(target)
     if dry_run:
-        vm = ops.get_vm(conn, vm_ext_id)
-        return {"dryRun": True, "wouldDelete": {"extId": vm["extId"], "name": vm["name"],
-                                                "powerState": vm["powerState"]}}
+        # The preview runs the self-lockout guard too: if the real delete would
+        # be refused, the dry-run must say so rather than report wouldDelete.
+        return {"dryRun": True, "wouldDelete": ops.preview_delete_vm(conn, vm_ext_id)}
     return ops.delete_vm(conn, vm_ext_id)
 
 

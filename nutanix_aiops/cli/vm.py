@@ -15,6 +15,7 @@ from nutanix_aiops.cli._common import (
     console,
     double_confirm,
     dry_run_print,
+    dry_run_result,
     get_connection,
     print_envelope,
 )
@@ -85,8 +86,14 @@ def vm_delete(
     from mcp_server.tools import vms as gov
 
     if dry_run:
-        dry_run_print(operation="delete_vm",
-                      api_call=f"DELETE /api/vmm/v4.0/ahv/config/vms/{vm_ext_id}")
+        # Routed through the governed twin so the preview runs the same guards
+        # and lands the same audit row as the real delete; the banner stays.
+        dry_run_result(
+            gov.vm_delete(vm_ext_id=vm_ext_id, dry_run=True, target=target),
+            operation="delete_vm",
+            api_call=f"DELETE /api/vmm/v4.0/ahv/config/vms/{vm_ext_id}",
+            payload_key="wouldDelete",
+        )
         return
     double_confirm("delete VM", vm_ext_id)
     console.print_json(json.dumps(gov.vm_delete(vm_ext_id=vm_ext_id, target=target)))

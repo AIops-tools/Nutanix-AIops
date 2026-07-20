@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.5.0 — 2026-07-20
+
+### Fixed
+- **Power-off, shutdown, delete and snapshot-restore refuse the Prism Central VM.** PC is itself a VM and is returned as an ordinary `vm_list` row; powering it off succeeded and the API that would power it back on ceased to exist, leaving the recorded undo permanently unapplicable.
+- `lcm_update` now requires a passed `lcm_precheck`.
+- `delete_subnet` captures the full prior state (VLAN id, cluster, IP config, pools) instead of only the name, so the audit row is enough to rebuild it by hand..
+- Harness: a write whose response is lost is audited `status=unknown`, not `error` — it may have taken effect. Undo tokens gain `effectVerified` (undo.db migrated in place).
+- Harness: a dry-run no longer records an undo token, and no longer requires a named approver. Guards now run on the preview path.
+- Truncated strings end in an ellipsis instead of being cut silently; error messages are capped at 800 chars, not 300.
+
+See RELEASE_NOTES.md for the full detail.
+
 ## v0.3.0 — 2026-07-17
 
 ### Added

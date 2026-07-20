@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from nutanix_aiops.ops._selfguard import refuse_self_lockout
 from nutanix_aiops.ops._util import (
     DEFAULT_LIST_LIMIT,
     _seg,
@@ -124,10 +125,37 @@ def delete_snapshot(conn: Any, vm_ext_id: str, snapshot_ext_id: str) -> dict:
             "priorState": {"name": opt(obj.get("name"))}}
 
 
+#: Refusal (verb, cost) for a revert. Named once so the real write and its
+#: dry-run preview quote IDENTICAL text.
+_REVERT_REFUSAL = (
+    "revert",
+    "A revert is not undoable and would roll Prism Central's own database back.",
+)
+
+
+def preview_restore_snapshot(conn: Any, vm_ext_id: str, snapshot_ext_id: str) -> dict:
+    """Guarded dry-run preview for :func:`restore_snapshot` — reads only.
+
+    Same self-lockout check, same fetched record, same fail-open semantics as
+    the real revert, so the preview and the write always agree on whether the
+    operation is permitted.
+    """
+    raw, _etag = conn.get_with_etag(f"{_VMS}/{_seg(vm_ext_id)}")
+    refuse_self_lockout(conn, vm_ext_id, as_obj(raw), *_REVERT_REFUSAL)
+    return {"vmExtId": s(vm_ext_id), "snapshotExtId": s(snapshot_ext_id)}
+
+
 def restore_snapshot(conn: Any, vm_ext_id: str, snapshot_ext_id: str) -> dict:
-    """[WRITE][high] Revert a VM to a snapshot — destructive, NOT safely undoable."""
+    """[WRITE][high] Revert a VM to a snapshot — destructive, NOT safely undoable.
+
+    Refuses when the VM is the Prism Central this target talks to: a revert is
+    irreversible *and* would roll Prism Central's own database back underneath
+    the running service. Fails open when the VM reports no NICs or the target
+    host does not resolve.
+    """
     raw, etag = conn.get_with_etag(f"{_VMS}/{_seg(vm_ext_id)}")
     obj = as_obj(raw)
+    refuse_self_lockout(conn, vm_ext_id, obj, *_REVERT_REFUSAL)
     resp = as_obj(conn.post(f"{_VMS}/{_seg(vm_ext_id)}/$actions/revert", etag=etag,
                             json={"snapshotExtId": snapshot_ext_id}))
     return {"action": "restore_snapshot", "vmExtId": s(vm_ext_id),

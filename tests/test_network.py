@@ -1,9 +1,10 @@
 """Subnet / network ops + MCP tests for nutanix-aiops.
 
 Proves: list normalises raw subnet payloads, subnet_get surfaces the ETag via
-get_with_etag, the write tools carry correct risk tiers, and subnet_delete's
-dry-run gate never mutates. No real Prism Central is needed — the connection is
-a MagicMock.
+get_with_etag, the write tools carry correct risk tiers, subnet_delete's
+dry-run gate never mutates, and subnet_delete records a prior state complete
+enough to rebuild the subnet by hand. No real Prism Central is needed — the
+connection is a MagicMock.
 """
 
 from unittest.mock import MagicMock
@@ -87,3 +88,115 @@ def test_mcp_subnet_delete_dry_run_does_not_mutate(monkeypatch):
     assert result["dryRun"] is True
     assert result["wouldDelete"]["name"] == "vlan100"
     conn.delete.assert_not_called()
+
+
+# ── delete prior state: the delete has no inverse ──────────────────────────
+#
+# priorState is the ONLY surviving record of a deleted subnet. It once held the
+# name alone, which left the VLAN id, cluster and addressing unrecoverable —
+# the change could not be reconstructed even by hand from the audit row.
+
+_FULL_SUBNET = {
+    "extId": "sn1",
+    "name": "vlan100",
+    "description": "lab network",
+    "subnetType": "VLAN",
+    "networkId": 100,
+    "clusterReference": {"extId": "cl1"},
+    "ipConfig": [
+        {
+            "ipv4": {
+                "ipSubnet": {"ip": {"value": "10.0.0.0"}, "prefixLength": 24},
+                "defaultGatewayIp": {"value": "10.0.0.1"},
+                "poolList": [
+                    {"startIp": {"value": "10.0.0.50"}, "endIp": {"value": "10.0.0.99"}},
+                    {"startIp": {"value": "10.0.0.150"}, "endIp": {"value": "10.0.0.199"}},
+                ],
+            }
+        }
+    ],
+}
+
+
+@pytest.mark.unit
+def test_delete_subnet_captures_full_prior_state():
+    """(d) Everything needed to recreate the subnet, not just its name."""
+    from nutanix_aiops.ops import network as ops
+
+    conn = MagicMock(name="conn")
+    conn.get_with_etag.return_value = ({"data": _FULL_SUBNET}, "etag-1")
+    prior = ops.delete_subnet(conn, "sn1")["priorState"]
+
+    assert prior["name"] == "vlan100"
+    assert prior["description"] == "lab network"
+    assert prior["subnetType"] == "VLAN"
+    assert prior["vlanId"] == 100
+    assert prior["clusterExtId"] == "cl1"
+    assert prior["ipConfig"] == {"cidr": "10.0.0.0/24", "gateway": "10.0.0.1"}
+    assert prior["ipPools"] == [
+        {"startIp": "10.0.0.50", "endIp": "10.0.0.99"},
+        {"startIp": "10.0.0.150", "endIp": "10.0.0.199"},
+    ]
+    conn.delete.assert_called_once_with(
+        "/api/networking/v4.0/config/subnets/sn1", etag="etag-1"
+    )
+
+
+@pytest.mark.unit
+def test_delete_subnet_prior_state_survives_a_sparse_response():
+    """(e) Fail open: a sparse subnet record yields nulls, never a crash."""
+    from nutanix_aiops.ops import network as ops
+
+    conn = MagicMock(name="conn")
+    conn.get_with_etag.return_value = ({"data": {"extId": "sn2"}}, "etag-2")
+    prior = ops.delete_subnet(conn, "sn2")["priorState"]
+
+    # Keys are always present — an absent field must read as null, not as gone.
+    assert set(prior) == {"name", "description", "subnetType", "vlanId",
+                          "clusterExtId", "ipConfig", "ipPools"}
+    assert prior["name"] is None
+    assert prior["description"] is None
+    assert prior["vlanId"] is None
+    assert prior["clusterExtId"] is None
+    assert prior["ipConfig"] == {}
+    assert prior["ipPools"] == []
+    conn.delete.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "ipconfig",
+    [
+        "not-a-list",
+        [None, "junk"],
+        [{"ipv4": {"poolList": "not-a-list"}}],
+        [{"ipv4": {"poolList": [None, {}]}}],
+        [{"ipv4": None}],
+    ],
+)
+def test_ip_pool_capture_tolerates_malformed_ip_config(ipconfig):
+    """A shape the API was not documented to return must not break the delete."""
+    from nutanix_aiops.ops import network as ops
+
+    conn = MagicMock(name="conn")
+    conn.get_with_etag.return_value = (
+        {"data": {"extId": "sn3", "name": "odd", "ipConfig": ipconfig}}, "etag-3"
+    )
+    assert ops.delete_subnet(conn, "sn3")["priorState"]["ipPools"] == []
+
+
+@pytest.mark.unit
+def test_delete_subnet_captures_ipv6_pools():
+    """IPv6-only subnets record their pools too — the fallback is not IPv4-only."""
+    from nutanix_aiops.ops import network as ops
+
+    conn = MagicMock(name="conn")
+    conn.get_with_etag.return_value = (
+        {"data": {"extId": "sn4", "name": "v6",
+                  "ipConfig": [{"ipv6": {"poolList": [
+                      {"startIp": {"value": "2001:db8::10"},
+                       "endIp": {"value": "2001:db8::20"}}]}}]}},
+        "etag-4",
+    )
+    prior = ops.delete_subnet(conn, "sn4")["priorState"]
+    assert prior["ipPools"] == [{"startIp": "2001:db8::10", "endIp": "2001:db8::20"}]

@@ -43,10 +43,18 @@ def print_envelope(result: dict, key: str) -> None:
 
 
 def _cli_error_types() -> tuple[type[BaseException], ...]:
-    """Exceptions translated to a one-line teaching error instead of a traceback."""
-    from nutanix_aiops.connection import NutanixApiError
+    """Exceptions translated to a one-line teaching error instead of a traceback.
 
-    return (NutanixApiError, KeyError, OSError, ValueError)
+    ``PolicyDenied`` belongs here even though it is not a ValueError: its message
+    names the exact env var to set and why, which is the single most actionable
+    error this tool produces. Without it a high-risk command with no approver
+    exits 1 printing NOTHING — a bare traceback for the product's flagship
+    graduated-approval feature.
+    """
+    from nutanix_aiops.connection import NutanixApiError
+    from nutanix_aiops.governance import PolicyDenied
+
+    return (NutanixApiError, KeyError, OSError, ValueError, PolicyDenied)
 
 
 def cli_errors(fn: Callable) -> Callable:
@@ -86,6 +94,35 @@ def dry_run_print(*, operation: str, api_call: str, parameters: dict | None = No
     for k, v in (parameters or {}).items():
         console.print(f"[magenta]  Param:     {k} = {v}[/]")
     console.print("[magenta]  Run without --dry-run to execute.[/]\n")
+
+
+def dry_run_result(
+    result: Any, *, operation: str, api_call: str, payload_key: str = ""
+) -> None:
+    """Render a governed dry-run result as the human DRY-RUN banner, or refuse.
+
+    CLI previews route through the ``@governed_tool``-wrapped twin so they run
+    the same guards and land the same audit row as the real call — the CLI
+    silently not auditing previews was the outlier, since MCP previews have
+    always been audited. Only the *serialization* stays CLI-shaped: the caller
+    is a human, so the returned dict is rendered into the existing banner rather
+    than dumped as JSON.
+
+    A preview that cannot be refused would promise an operation the write then
+    rejects, so a refusal is surfaced exactly like a refused real write: the
+    teaching message in red, exit code 1.
+
+    Invariant: **a dry_run MAY read; it must never write.**
+    """
+    if isinstance(result, dict) and result.get("error"):
+        console.print(f"[red]Error: {result['error']}[/]")
+        raise typer.Exit(1)
+    payload = result.get(payload_key) if isinstance(result, dict) and payload_key else None
+    dry_run_print(
+        operation=operation,
+        api_call=api_call,
+        parameters=payload if isinstance(payload, dict) else None,
+    )
 
 
 def double_confirm(action: str, resource: str) -> None:

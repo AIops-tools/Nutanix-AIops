@@ -1,9 +1,10 @@
 """LCM (Life Cycle Manager) MCP tools (read + guarded writes).
 
 Surfaces the LCM upgrade inventory and the two LCM actions. Precheck is a
-read-safe validation action (risk=low); update is the actual firmware/software
-upgrade (risk=high) and accepts a ``dry_run`` preview. Everything runs through
-the governance harness.
+read-safe validation action (risk=medium); update is the actual firmware/software
+upgrade (risk=high), accepts a ``dry_run`` preview, and is refused unless the
+precheck's task extId is handed back and that task reached SUCCEEDED. Everything
+runs through the governance harness.
 """
 
 from typing import Optional
@@ -51,21 +52,34 @@ def lcm_precheck(
 def lcm_update(
     cluster_ext_id: str,
     entity_ext_ids: list[str],
+    precheck_task_ext_id: str = "",
     dry_run: bool = False,
     target: Optional[str] = None,
 ) -> dict:
     """[WRITE][risk=high] Perform an LCM firmware/software update. Pass dry_run=True to preview.
 
-    Destructive — requires an approver (set NUTANIX_AUDIT_APPROVED_BY) under the
-    graduated-autonomy policy. Run lcm_precheck first.
+    Destructive and NOT undoable — requires an approver (set NUTANIX_AUDIT_APPROVED_BY)
+    under the graduated-autonomy policy, AND a precheck that passed: run lcm_precheck
+    first and pass the taskExtId it returned. The update is refused without it. The
+    dry_run preview enforces the same requirement, so a preview can never report an
+    update the real call would refuse.
 
     Args:
         cluster_ext_id: Cluster extId as returned by cluster_list.
         entity_ext_ids: LCM entity extIds (from lcm_inventory) to update.
+        precheck_task_ext_id: taskExtId returned by lcm_precheck for these entities,
+            once that task has reached SUCCEEDED (check with task_list). Required —
+            the update is refused without it.
         dry_run: If True, return what WOULD be updated without updating.
         target: Prism Central target name from config; omit for the default.
     """
+    conn = _get_connection(target)
     if dry_run:
-        return {"dryRun": True, "wouldUpdate": {"clusterExtId": cluster_ext_id,
-                                                "entities": entity_ext_ids}}
-    return ops.perform_update(_get_connection(target), cluster_ext_id, entity_ext_ids)
+        # The preview runs the precheck requirement too: if the real update
+        # would be refused, the dry-run must say so rather than report wouldUpdate.
+        return {
+            "dryRun": True,
+            "wouldUpdate": ops.preview_update(conn, cluster_ext_id, entity_ext_ids,
+                                              precheck_task_ext_id),
+        }
+    return ops.perform_update(conn, cluster_ext_id, entity_ext_ids, precheck_task_ext_id)

@@ -88,8 +88,8 @@
 | Tool | Risk | API path | Returns |
 |------|------|----------|---------|
 | `lcm_inventory` | read | `GET /api/lifecycle/v4.0/resources/entities` | firmware / software entities + available versions |
-| `lcm_precheck` | write · low | `POST /api/lifecycle/v4.0/resources/$actions/perform-precheck` | precheck task ref |
-| `lcm_update` | write · **HIGH** | `POST /api/lifecycle/v4.0/resources/$actions/perform-update` | **firmware/software update**; **dry_run** |
+| `lcm_precheck` | write · medium | `POST /api/lifecycle/v4.0/resources/$actions/perform-precheck` | precheck task ref |
+| `lcm_update` | write · **HIGH** | `POST /api/lifecycle/v4.0/resources/$actions/perform-update` | **firmware/software update**; **dry_run**; **refused unless `precheck_task_ext_id` names a precheck task that reached SUCCEEDED** |
 
 ## Capacity (2 read)
 

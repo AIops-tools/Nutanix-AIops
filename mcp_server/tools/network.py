@@ -74,7 +74,8 @@ def subnet_delete(ext_id: str, dry_run: bool = False, target: Optional[str] = No
     """[WRITE][risk=high] Delete a subnet. Destructive — pass dry_run=True to preview first.
 
     Requires an approver (set NUTANIX_AUDIT_APPROVED_BY) under the graduated-autonomy
-    policy. Captures the subnet's prior name on the audit trail.
+    policy. Irreversible, so the audit trail captures the subnet's full prior state
+    (name, description, type, VLAN id, cluster, IP config and pools).
 
     Args:
         ext_id: Subnet extId as returned by subnet_list.

@@ -230,13 +230,15 @@ def test_create_subnet_builds_spec():
 
 
 @pytest.mark.unit
-def test_delete_subnet_captures_prior_name():
+def test_delete_subnet_captures_prior_state_and_sends_the_etag():
+    """priorState is the whole subnet, not just its name — see test_network.py
+    for the field-by-field assertions; this pins the ETag round trip."""
     from nutanix_aiops.ops import network as ops
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = ({"data": {"extId": "sn1", "name": "vlan100"}}, "etag-4")
     result = ops.delete_subnet(conn, "sn1")
-    assert result["priorState"] == {"name": "vlan100"}
+    assert result["priorState"]["name"] == "vlan100"
     conn.delete.assert_called_once_with(
         "/api/networking/v4.0/config/subnets/sn1", etag="etag-4")
 

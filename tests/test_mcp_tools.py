@@ -173,6 +173,11 @@ def test_snapshot_restore_and_pd_failover_dry_runs(gov_home, monkeypatch):
     from mcp_server.tools import dataprotection as gov
 
     conn = MagicMock(name="conn")
+    # The revert preview now READS the VM (one GET) so it can run the same
+    # self-lockout check the real revert would — a preview that cannot be
+    # refused would promise an operation the write then rejects.
+    conn.get_with_etag.return_value = ({"data": {"extId": "v1", "name": "web01"}}, "etag-1")
+    conn.target.host = "10.0.0.10"
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
 
     restore = gov.snapshot_restore(vm_ext_id="v1", snapshot_ext_id="snap-1", dry_run=True)
@@ -180,7 +185,7 @@ def test_snapshot_restore_and_pd_failover_dry_runs(gov_home, monkeypatch):
 
     failover = gov.pd_failover(policy_ext_id="pol-1", cluster_ext_id="cl-2", dry_run=True)
     assert failover["wouldFailover"]["targetClusterExtId"] == "cl-2"
-    conn.post.assert_not_called()
+    conn.post.assert_not_called()  # still a preview: nothing was written
 
 
 @pytest.mark.unit
@@ -195,3 +200,76 @@ def test_image_delete_twin_executes_and_captures_prior(gov_home, monkeypatch):
     result = gov.image_delete(ext_id="img-1")
     assert result["priorState"] == {"name": "ubuntu.iso"}
     conn.delete.assert_called_once()
+
+
+# ── dry_run previews are guarded at the MCP wrapper, not just in ops ─────────
+
+
+def _pc_mcp_conn(raw, host="10.0.0.10"):
+    conn = MagicMock(name="conn")
+    conn.get_with_etag.return_value = ({"data": raw}, "etag-1")
+    conn.target.host = host
+    return conn
+
+
+_PC_VM = {"extId": "vm-pc", "name": "pc", "powerState": "ON",
+          "nics": [{"networkInfo": {"ipv4Config": {"ipAddress": [{"value": "10.0.0.10"}]}}}]}
+_WEB_VM = {"extId": "vm-web", "name": "web01", "powerState": "ON",
+           "nics": [{"networkInfo": {"ipv4Config": {"ipAddress": [{"value": "10.0.0.55"}]}}}]}
+
+
+@pytest.mark.unit
+def test_vm_delete_dry_run_on_prism_central_is_refused(gov_home, monkeypatch):
+    """Pins the WIRING: the wrapper must route its preview through the guarded
+    ops.preview_delete_vm. Reverting it to the old get_vm call would still pass
+    every ops-level test, so the assertion has to live here."""
+    from mcp_server.tools import vms as gov
+
+    conn = _pc_mcp_conn(_PC_VM)
+    monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
+
+    out = gov.vm_delete(vm_ext_id="vm-pc", dry_run=True)
+    assert "Refusing to delete" in out["error"]
+    assert "wouldDelete" not in out  # no green preview for a call that will be refused
+    conn.delete.assert_not_called()
+
+
+@pytest.mark.unit
+def test_vm_delete_dry_run_on_a_normal_vm_still_returns_its_preview(gov_home, monkeypatch):
+    """Proves the dry-run guard is EXACT, not blanket — same Prism Central target."""
+    from mcp_server.tools import vms as gov
+
+    conn = _pc_mcp_conn(_WEB_VM)
+    monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
+
+    out = gov.vm_delete(vm_ext_id="vm-web", dry_run=True)
+    assert out["dryRun"] is True
+    assert out["wouldDelete"]["name"] == "web01"
+    assert out["wouldDelete"]["powerState"] == "ON"
+    conn.delete.assert_not_called()
+
+
+@pytest.mark.unit
+def test_snapshot_restore_dry_run_on_prism_central_is_refused(gov_home, monkeypatch):
+    from mcp_server.tools import dataprotection as gov
+
+    conn = _pc_mcp_conn(_PC_VM)
+    monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
+
+    out = gov.snapshot_restore(vm_ext_id="vm-pc", snapshot_ext_id="snap-1", dry_run=True)
+    assert "Refusing to revert" in out["error"]
+    assert "wouldRevert" not in out
+    conn.post.assert_not_called()
+
+
+@pytest.mark.unit
+def test_snapshot_restore_dry_run_on_a_normal_vm_still_returns_its_preview(gov_home, monkeypatch):
+    from mcp_server.tools import dataprotection as gov
+
+    conn = _pc_mcp_conn(_WEB_VM)
+    monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
+
+    out = gov.snapshot_restore(vm_ext_id="vm-web", snapshot_ext_id="snap-1", dry_run=True)
+    assert out["dryRun"] is True
+    assert out["wouldRevert"] == {"vmExtId": "vm-web", "snapshotExtId": "snap-1"}
+    conn.post.assert_not_called()
