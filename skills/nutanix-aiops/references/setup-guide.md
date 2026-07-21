@@ -64,11 +64,14 @@ export NUTANIX_AIOPS_MASTER_PASSWORD='your-master-password'
   echoed; exception text and tracebacks are scrubbed of secret-shaped strings
   before being written to the audit log.
 
-## High-risk approvals
+## Optional audit annotations
 
-High-risk operations (`vm_delete`, `vm_migrate`, `storage_container_delete`,
-`subnet_delete`, `snapshot_delete`, `snapshot_restore`, `pd_failover`,
-`image_delete`, `lcm_update`) can require a **named approver**:
+The skill does not decide whether a write is permitted — that is the agent's
+judgement, or the permission of the account you connect it with (connect with
+a Prism Central account holding only a read-only (Viewer) role, and writes
+fail at the server). `NUTANIX_AUDIT_APPROVED_BY` / `NUTANIX_AUDIT_RATIONALE`
+optionally annotate the audit row with who authorized a high-risk operation
+and why — they are never required and never block a call:
 
 ```bash
 export NUTANIX_AUDIT_APPROVED_BY='alice@example.com'
@@ -79,8 +82,7 @@ export NUTANIX_AUDIT_RATIONALE='Decommissioning migrated ESXi guest per CHG-1234
 
 State lives under `~/.nutanix-aiops/` (relocate with `NUTANIX_AIOPS_HOME`):
 
-- `audit.db` — every tool call (SQLite), with risk tier, approver, rationale
-- `rules.yaml` — policy: deny rules, maintenance windows, approval tiers
+- `audit.db` — every tool call (SQLite), with risk tier and any approver/rationale supplied
 - `undo.db` — inverse descriptors for reversible writes (e.g. `vm_update` prior
   CPU/memory, `vm_migrate` prior host)
 - budget / runaway guard — caps cumulative tool calls and wall-time; trips on

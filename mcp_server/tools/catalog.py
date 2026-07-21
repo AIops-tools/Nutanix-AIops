@@ -51,8 +51,9 @@ def category_list(limit: int = 500, target: Optional[str] = None) -> dict:
 def image_delete(ext_id: str, dry_run: bool = False, target: Optional[str] = None) -> dict:
     """[WRITE][risk=high] Delete an image. Destructive — pass dry_run=True to preview first.
 
-    Requires an approver (set NUTANIX_AUDIT_APPROVED_BY) under the graduated-autonomy
-    policy. Captures the image's prior name on the audit trail.
+    Tagged risk=high (audit tier 'review'); NUTANIX_AUDIT_APPROVED_BY /
+    NUTANIX_AUDIT_RATIONALE optionally annotate who/why. Captures the image's
+    prior name on the audit trail.
 
     Args:
         ext_id: Image extId as returned by image_list.

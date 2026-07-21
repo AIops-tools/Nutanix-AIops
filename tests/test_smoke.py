@@ -311,7 +311,7 @@ def test_cli_vm_delete_dry_run_gates(monkeypatch):
 
     The invariant is "a dry_run MAY read; it must never write" — this preview
     reads so it can run the same guards as the real delete. It routes through
-    the governed twin, so the risk=high approver gate applies to it too.
+    the governed twin, so the risk=high tier is tagged on its audit row too.
     """
     import mcp_server.tools.vms as gov
     from nutanix_aiops.cli import app
@@ -362,3 +362,33 @@ def test_overview_is_resilient_to_partial_failure():
     out = ops.fleet_overview(conn)
     assert out["clusters"] == 0
     assert out["errors"]  # collected, not raised
+
+
+@pytest.mark.unit
+def test_risk_level_agrees_with_read_write_docstring_tag():
+    """The two write-markers must never drift apart.
+
+    A tool's ``risk_level`` decides its audit tier and whether it gets dry-run /
+    undo handling; its ``[READ]``/``[WRITE]`` docstring tag is what the docs and
+    capability tables are built from. If a ``[WRITE]`` were left ``risk_level=low``
+    it would be audited as a read and skip the write machinery — this test caught
+    16 such mislabels line-wide once, so it is kept even though read-only mode
+    (its original motivation) is gone.
+    """
+    from mcp_server import server
+
+    untagged, mismatched = [], []
+    for name, tool in server.mcp._tool_manager._tools.items():
+        doc = (tool.fn.__doc__ or "").lstrip()
+        if doc.startswith("[READ]"):
+            tagged_as_read = True
+        elif doc.startswith("[WRITE]"):
+            tagged_as_read = False
+        else:
+            untagged.append(name)
+            continue
+        if tagged_as_read != (getattr(tool.fn, "_risk_level", "low") == "low"):
+            mismatched.append(name)
+
+    assert not untagged, f"tools missing a [READ]/[WRITE] docstring tag: {untagged}"
+    assert not mismatched, f"risk_level disagrees with the docstring tag: {mismatched}"

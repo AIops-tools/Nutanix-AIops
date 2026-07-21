@@ -65,8 +65,7 @@ def test_cli_vm_delete_dry_run_reads_and_audits_but_never_writes(gov_home, monke
     import mcp_server.tools.vms as gov_vms
     from nutanix_aiops.cli import app
 
-    # vm_delete is risk=high, so the secure-by-default approver gate applies to
-    # the preview too now that it runs through the governed twin.
+    # Harmless audit annotation — the harness does not gate on it.
     monkeypatch.setenv("NUTANIX_AUDIT_APPROVED_BY", "tester")
     conn = _mock_vm_conn()
     monkeypatch.setattr(gov_vms, "_get_connection", lambda target=None: conn)
@@ -106,32 +105,6 @@ def test_cli_vm_delete_dry_run_on_prism_central_refuses_nonzero(gov_home, monkey
 
 
 @pytest.mark.unit
-def test_cli_high_risk_without_approver_teaches_instead_of_tracebacking(gov_home, monkeypatch):
-    """PolicyDenied must render as one teaching line, not a bare traceback.
-
-    Its message names the exact env var to set — the most actionable error this
-    tool produces — and it was being swallowed because PolicyDenied is not a
-    ValueError.
-
-    Exercised on the REAL write path: a preview deliberately does not demand an
-    approver (you would need the approval to learn whether one is needed), so
-    the denial only happens here.
-    """
-    import mcp_server.tools.vms as gov_vms
-    from nutanix_aiops.cli import app
-
-    monkeypatch.delenv("NUTANIX_AUDIT_APPROVED_BY", raising=False)
-    conn = _mock_vm_conn()
-    monkeypatch.setattr(gov_vms, "_get_connection", lambda target=None: conn)
-
-    result = CliRunner().invoke(app, ["vm", "delete", "v1"], input="y\ny\n")
-    assert result.exit_code == 1
-    assert "NUTANIX_AUDIT_APPROVED_BY" in result.output
-    assert result.output.strip(), "a denial must never exit silently"
-    conn.delete.assert_not_called()
-
-
-@pytest.mark.unit
 def test_cli_vm_delete_confirmed_goes_through_governance(gov_home, monkeypatch):
     """Confirmed CLI write must execute via the governed twin: the API call runs
     AND an audit row lands in audit.db (this is what the reroute fix bought)."""
@@ -145,6 +118,55 @@ def test_cli_vm_delete_confirmed_goes_through_governance(gov_home, monkeypatch):
     assert result.exit_code == 0, result.output
     conn.delete.assert_called_once()
     assert _audit_tools(gov_home / "audit.db") == ["vm_delete"]
+
+
+@pytest.mark.unit
+def test_cli_vm_migrate_dry_run_reads_and_audits_but_never_writes(gov_home, monkeypatch):
+    """Same invariant as the delete preview, on the newly routed migrate path.
+
+    The banner's host names now come from the twin's own preview (it reads the
+    VM to resolve the current host) rather than from a hand-written string that
+    could drift from what the migrate would really do.
+    """
+    import mcp_server.tools.vms as gov_vms
+    from nutanix_aiops.cli import app
+
+    monkeypatch.setenv("NUTANIX_AUDIT_APPROVED_BY", "tester")
+    conn = MagicMock(name="conn")
+    conn.get_with_etag.return_value = (
+        {"data": {"extId": "v1", "name": "web01", "host": {"extId": "h-old"}}},
+        "etag-1",
+    )
+    monkeypatch.setattr(gov_vms, "_get_connection", lambda target=None: conn)
+
+    result = CliRunner().invoke(app, ["vm", "migrate", "v1", "h-new", "--dry-run"])
+    assert result.exit_code == 0, result.output
+    assert "DRY-RUN" in result.output  # human banner, not raw JSON
+    assert "h-new" in result.output  # destination still shown
+    assert "h-old" in result.output  # and now the REAL current host, from the twin
+    conn.post.assert_not_called()  # no POST — the migrate action never fired
+    conn.delete.assert_not_called()
+    conn.get_with_etag.assert_called()  # it DID read, to resolve fromHost
+    assert _audit_tools(gov_home / "audit.db") == ["vm_migrate"]
+
+
+@pytest.mark.unit
+def test_cli_vm_migrate_dry_run_refusal_exits_nonzero(gov_home, monkeypatch):
+    """A preview that the twin refuses must not print a green banner."""
+    import mcp_server.tools.vms as gov_vms
+    from nutanix_aiops.cli import app
+    from nutanix_aiops.connection import NutanixApiError
+
+    monkeypatch.setenv("NUTANIX_AUDIT_APPROVED_BY", "tester")
+    conn = MagicMock(name="conn")
+    conn.get_with_etag.side_effect = NutanixApiError("VM 'v-gone' does not exist")
+    monkeypatch.setattr(gov_vms, "_get_connection", lambda target=None: conn)
+
+    result = CliRunner().invoke(app, ["vm", "migrate", "v-gone", "h-new", "--dry-run"])
+    assert result.exit_code == 1
+    assert "does not exist" in result.output
+    assert "DRY-RUN" not in result.output
+    conn.post.assert_not_called()
 
 
 @pytest.mark.unit

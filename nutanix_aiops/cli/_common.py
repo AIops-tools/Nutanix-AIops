@@ -45,11 +45,9 @@ def print_envelope(result: dict, key: str) -> None:
 def _cli_error_types() -> tuple[type[BaseException], ...]:
     """Exceptions translated to a one-line teaching error instead of a traceback.
 
-    ``PolicyDenied`` belongs here even though it is not a ValueError: its message
-    names the exact env var to set and why, which is the single most actionable
-    error this tool produces. Without it a high-risk command with no approver
-    exits 1 printing NOTHING — a bare traceback for the product's flagship
-    graduated-approval feature.
+    ``PolicyDenied`` is kept here for backward compatibility with anything that
+    still catches it, even though the harness no longer raises it: the skill
+    does not authorize a write, so nothing in this tool denies one.
     """
     from nutanix_aiops.connection import NutanixApiError
     from nutanix_aiops.governance import PolicyDenied
@@ -96,33 +94,26 @@ def dry_run_print(*, operation: str, api_call: str, parameters: dict | None = No
     console.print("[magenta]  Run without --dry-run to execute.[/]\n")
 
 
-def dry_run_result(
-    result: Any, *, operation: str, api_call: str, payload_key: str = ""
+def dry_run_preview(
+    preview: Any, *, operation: str, api_call: str, parameters: dict | None = None
 ) -> None:
-    """Render a governed dry-run result as the human DRY-RUN banner, or refuse.
+    """Render a GOVERNED dry-run result as the human-readable DRY-RUN banner.
 
-    CLI previews route through the ``@governed_tool``-wrapped twin so they run
-    the same guards and land the same audit row as the real call — the CLI
-    silently not auditing previews was the outlier, since MCP previews have
-    always been audited. Only the *serialization* stays CLI-shaped: the caller
-    is a human, so the returned dict is rendered into the existing banner rather
-    than dumped as JSON.
+    ``preview`` must come from calling the governed tool with ``dry_run=True``,
+    so every guard it carries has already run against the real target. A refusal
+    arrives as ``{"error": ...}`` (``tool_errors`` flattens the exception) — it is
+    printed like any other CLI error and exits non-zero, exactly as the real
+    write would. Printing a green banner for a call that is about to be refused
+    is the preview being wrong, not merely incomplete.
 
-    A preview that cannot be refused would promise an operation the write then
-    rejects, so a refusal is surfaced exactly like a refused real write: the
-    teaching message in red, exit code 1.
-
-    Invariant: **a dry_run MAY read; it must never write.**
+    On the allowed path the banner is byte-for-byte what it always was: routing
+    through the governed call buys the guard and the audit row, not a new
+    serialization.
     """
-    if isinstance(result, dict) and result.get("error"):
-        console.print(f"[red]Error: {result['error']}[/]")
+    if isinstance(preview, dict) and preview.get("error"):
+        console.print(f"[red]Error: {preview['error']}[/]")
         raise typer.Exit(1)
-    payload = result.get(payload_key) if isinstance(result, dict) and payload_key else None
-    dry_run_print(
-        operation=operation,
-        api_call=api_call,
-        parameters=payload if isinstance(payload, dict) else None,
-    )
+    dry_run_print(operation=operation, api_call=api_call, parameters=parameters)
 
 
 def double_confirm(action: str, resource: str) -> None:

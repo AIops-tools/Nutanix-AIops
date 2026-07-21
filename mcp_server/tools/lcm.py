@@ -58,10 +58,11 @@ def lcm_update(
 ) -> dict:
     """[WRITE][risk=high] Perform an LCM firmware/software update. Pass dry_run=True to preview.
 
-    Destructive and NOT undoable — requires an approver (set NUTANIX_AUDIT_APPROVED_BY)
-    under the graduated-autonomy policy, AND a precheck that passed: run lcm_precheck
-    first and pass the taskExtId it returned. The update is refused without it. The
-    dry_run preview enforces the same requirement, so a preview can never report an
+    Destructive and NOT undoable — tagged risk=high (audit tier 'review');
+    NUTANIX_AUDIT_APPROVED_BY / NUTANIX_AUDIT_RATIONALE optionally annotate
+    who/why. Requires a precheck that passed: run lcm_precheck first and pass
+    the taskExtId it returned. The update is refused without it. The dry_run
+    preview enforces the same requirement, so a preview can never report an
     update the real call would refuse.
 
     Args:

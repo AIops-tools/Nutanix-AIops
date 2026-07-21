@@ -7,8 +7,8 @@
 Governed AI-ops for **Nutanix Prism Central** (v4 REST API) — clusters, hosts,
 VMs (AHV + ESXi), storage, network, catalog, data protection / DR, alerts, LCM
 upgrades, and capacity — with a **built-in governance harness**: unified audit
-log, policy engine, token/runaway budget guard, undo-token recording, and
-graduated-autonomy risk tiers. Connects to Prism Central on HTTPS `:9440` with
+log, token/runaway budget guard, undo-token recording, and descriptive
+risk-tier labels. Connects to Prism Central on HTTPS `:9440` with
 HTTP Basic auth (username + encrypted password). Self-contained: no dependencies
 beyond `httpx` and the MCP SDK.
 
@@ -24,44 +24,28 @@ beyond `httpx` and the MCP SDK.
   `null`, never as `""`. v4 omits a lot of fields; the two facts stay distinct.
 - **Mixed-hypervisor VM listing** — `vm_list` returns both **AHV** and **ESXi**
   guests under the same Prism Central (built for hypervisor-migration estates).
-- **Governance harness** — audit / token+call budget / risk-tier approval /
-  undo-token / prompt-injection sanitize, with **dry-run + double-confirm** on
-  destructive writes.
+- **Governance harness** — audit / token+call budget / descriptive risk-tier
+  labels / undo-token / prompt-injection sanitize, with **dry-run +
+  double-confirm** on destructive writes.
 
-## Security: read-only mode
+## What this tool does, and does not, decide
 
-This tool is meant to be handed to an AI agent, so its safety story is enforced
-by the server rather than requested in a prompt:
+It delivers Nutanix Prism Central operations — reads and writes — accurately and
+efficiently, and records every one of them. It does **not** decide whether a write is
+allowed to happen. That is the agent's judgement, or the permission of the account
+you connect it with: connect with a Prism Central account holding only a
+read-only (Viewer) role, and the writes fail at the server — the place that
+actually owns the permission.
 
-```bash
-export NUTANIX_READ_ONLY=1
-```
+So there is no read-only switch, no policy file, no approval gate to configure. The
+one thing the tool guarantees is that nothing is silent: **every call, over MCP and
+over the CLI alike, lands an audit row** in `~/.nutanix-aiops/audit.db`, and
+destructive writes still capture their before-state and record an inverse where one
+exists.
 
-With that set, the **27 write tools are never registered**. An MCP client
-lists **24 tools instead of 51** — the writes are not hidden, not
-gated behind a flag, and not merely refused when called. They are absent from
-the session. A model cannot invoke a tool it was never offered, and cannot be
-argued into one.
-
-That distinction is the whole point. A tool that exists but refuses still invites
-retry loops and "I'll describe the call instead" behaviour from smaller models,
-and it leaves a reviewer trusting a promise. An absent tool is a fact you can
-check: connect, list the tools, and see that the writes are not there.
-
-Enforcement is two layers deep, so the switch cannot be sidestepped by changing
-entry point:
-
-| Layer | What it does | Covers |
-|---|---|---|
-| `@governed_tool` harness | refuses every non-read operation outright | MCP, CLI, and in-process callers |
-| MCP registration | write tools are removed from `list_tools()` | anything speaking MCP |
-
-Read operations are unaffected, and every call is still audited to
-`~/.nutanix-aiops/audit.db`.
-
-> The read/write split is derived from each tool's declared `risk_level`, and a
-> test asserts that this never disagrees with the `[READ]`/`[WRITE]` tag in the
-> tool's own documentation — so a write can't quietly present itself as a read.
+> Each tool declares a `risk_level`, carried into the audit row as a descriptive
+> tier (none/confirm/review) — so a reviewer can see at a glance that a row was a
+> high-risk delete. It is a label, not a gate.
 
 Running a smaller / local model? See
 [agent-guardrails.md](skills/nutanix-aiops/references/agent-guardrails.md) — it lists
@@ -134,14 +118,19 @@ The CLI is a convenience subset — the full 51-tool surface is via the MCP serv
 
 Every MCP tool passes through the bundled `@governed_tool` harness:
 
-- **Audit** — every call (params, result, status, duration, risk tier, approver,
-  rationale) is logged to `~/.nutanix-aiops/audit.db` (relocatable via
-  `NUTANIX_AIOPS_HOME`).
-- **Budget / runaway guard** — token and call budgets trip a circuit breaker.
-- **Risk tiers** — graduated autonomy; high-risk ops can require a named approver
-  (`NUTANIX_AUDIT_APPROVED_BY` / `NUTANIX_AUDIT_RATIONALE`).
-- **Undo recording** — reversible writes record an inverse descriptor
-  (`vm_update` → prior CPU/memory, `vm_migrate` → prior host).
+- **Audit** — every call (params, result, status, duration, risk tier, and any
+  operator-supplied approver/rationale) is logged to `~/.nutanix-aiops/audit.db`
+  (relocatable via `NUTANIX_AIOPS_HOME`). The CLI writes the same row the MCP
+  path does — there is no unaudited entry point.
+- **Runaway guard** — a safety backstop, not an authorization gate: the same
+  call hammered in a tight loop trips a circuit breaker. Disable with
+  `NUTANIX_RUNAWAY_MAX=0`; optional hard ceilings via `NUTANIX_MAX_TOOL_CALLS` /
+  `NUTANIX_MAX_TOOL_SECONDS`.
+- **Undo recording** — reversible writes record an inverse descriptor built
+  from the fetched before-state (`vm_update` → prior CPU/memory, `vm_migrate`
+  → prior host).
+- **Risk tier** — a descriptive label on the audit row derived from
+  `risk_level`; it gates nothing.
 
 ## Credentials
 

@@ -14,8 +14,8 @@ from nutanix_aiops.cli._common import (
     cli_errors,
     console,
     double_confirm,
+    dry_run_preview,
     dry_run_print,
-    dry_run_result,
     get_connection,
     print_envelope,
 )
@@ -69,6 +69,11 @@ def vm_power(
     if action not in fns:
         raise typer.BadParameter("action must be one of: on, off, shutdown, reboot")
     if dry_run:
+        # NOT routed through the governed twin: vm_power_on/off/guest_shutdown/
+        # reboot take no dry_run parameter, so there is no preview to ask them
+        # for — calling them would perform the write this flag exists to avoid.
+        # Inventing a twin-side preview is a separate change; until then this
+        # banner stays a static description and runs no guard.
         dry_run_print(operation=f"vm power {action}",
                       api_call=f"POST /api/vmm/v4.0/ahv/config/vms/{vm_ext_id}/$actions/{action}")
         return
@@ -88,11 +93,13 @@ def vm_delete(
     if dry_run:
         # Routed through the governed twin so the preview runs the same guards
         # and lands the same audit row as the real delete; the banner stays.
-        dry_run_result(
-            gov.vm_delete(vm_ext_id=vm_ext_id, dry_run=True, target=target),
+        preview = gov.vm_delete(vm_ext_id=vm_ext_id, dry_run=True, target=target)
+        would = preview.get("wouldDelete") if isinstance(preview, dict) else None
+        dry_run_preview(
+            preview,
             operation="delete_vm",
             api_call=f"DELETE /api/vmm/v4.0/ahv/config/vms/{vm_ext_id}",
-            payload_key="wouldDelete",
+            parameters=would if isinstance(would, dict) else None,
         )
         return
     double_confirm("delete VM", vm_ext_id)
@@ -111,9 +118,22 @@ def vm_migrate(
     from mcp_server.tools import vms as gov
 
     if dry_run:
-        dry_run_print(operation="migrate_vm",
-                      api_call=f"POST /api/vmm/v4.0/ahv/config/vms/{vm_ext_id}/$actions/migrate",
-                      parameters={"targetHost": target_host_ext_id})
+        # Routed through the governed twin: the preview runs the same guards and
+        # lands the same audit row as the real migrate. The banner's parameters
+        # now come from the twin's own preview (it reads the VM to resolve the
+        # current host) instead of being a hand-written guess.
+        preview = gov.vm_migrate(vm_ext_id=vm_ext_id, target_host_ext_id=target_host_ext_id,
+                                 dry_run=True, target=target)
+        params = {"targetHost": target_host_ext_id}
+        if isinstance(preview, dict):
+            params = {"vm": preview.get("vm"), "fromHost": preview.get("fromHost"),
+                      "toHost": preview.get("toHost")}
+        dry_run_preview(
+            preview,
+            operation="migrate_vm",
+            api_call=f"POST /api/vmm/v4.0/ahv/config/vms/{vm_ext_id}/$actions/migrate",
+            parameters=params,
+        )
         return
     double_confirm("migrate VM", vm_ext_id)
     console.print_json(json.dumps(

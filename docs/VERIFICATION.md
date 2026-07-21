@@ -89,13 +89,13 @@ do not silently pass.
 - [ ] A long operation (`vm_clone` or `lcm_update`) returns a task extId, and
       `task_list` follows it to completion without re-issuing the operation.
 
-### 6. Governance actually gates
-- [ ] With no `~/.nutanix-aiops/rules.yaml`, a `high`-risk op (e.g. `vm_delete`)
-      is refused unless `NUTANIX_AUDIT_APPROVED_BY` names an approver
-      (secure-by-default).
+### 6. Governance records, it does not gate
+- [ ] The harness authorizes nothing — there is no read-only, deny-rule, or
+      approver gate to test.
 - [ ] A tight poll loop trips the runaway budget guard rather than hammering
       Prism Central.
-- [ ] The audit row for each write records tier, approver, and rationale.
+- [ ] The audit row for each write records tier, and any approver/rationale
+      supplied (an optional annotation, not a requirement).
 
 ### 7. Cleanup
 - [ ] Delete the test VM and any snapshots/recovery points created above;

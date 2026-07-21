@@ -103,8 +103,9 @@ def storage_container_delete(
 ) -> dict:
     """[WRITE][risk=high] Delete a storage container. Destructive — pass dry_run=True first.
 
-    Requires an approver (set NUTANIX_AUDIT_APPROVED_BY) under the graduated-autonomy
-    policy. Captures the container's prior capacity/RF on the audit trail.
+    Tagged risk=high (audit tier 'review'); NUTANIX_AUDIT_APPROVED_BY /
+    NUTANIX_AUDIT_RATIONALE optionally annotate who/why. Captures the
+    container's prior capacity/RF on the audit trail.
 
     Args:
         ext_id: Storage container extId as returned by storage_container_list.

@@ -11,14 +11,16 @@ harness is a guarantee. Anything below that we could move into the harness, we d
 
 ## What the tool now enforces — do not waste prompt budget on these
 
+Authorization is not this tool's job — decide it via the account you connect it
+with, or the agent's own prompt. What the harness does guarantee:
+
 | You might be tempted to prompt | Why you don't need to |
 |---|---|
-| "Work read-only, never modify anything" | Set `NUTANIX_READ_ONLY=1`. Write tools are then **not registered at all** — they never appear in the tool list, so the model cannot call one even if it tries. The `@governed_tool` harness independently refuses any non-`low`-risk call, so the CLI and in-process callers are covered too. |
 | "Fetch the ETag before you change anything" | Prism Central v4 requires an `If-Match` ETag on most mutations (optimistic concurrency). Every write tool fetches the entity's current ETag itself and sends it back. There is **no ETag parameter for the model to get wrong**, and no read it must remember to run first. |
 | "Don't invent a value when a field is missing" | A field Prism Central did not return comes back as `null`, never as `""`. Absent and empty are distinguishable in the payload — which matters here, because v4 omits a great many fields (`description`, `hypervisorType`, host and cluster names, LCM version strings, alert `impactType`). |
 | "Tell me if the output was cut off" | Every list tool returns `{"<items>": [...], "returned": N, "limit": L, "truncated": true/false}`. Truncation is **measured** (one extra row is fetched), not guessed from a length coincidence. `vm_list`, `cluster_list`, `host_list`, `alert_list`, `event_list`, `audit_list`, `task_list`, `image_list`, `category_list`, `subnet_list`, `snapshot_list`, `recovery_point_list`, `protection_domain_list`, `storage_container_list`, `lcm_inventory` and `undo_list` all take a `limit` and report against it. |
 | "Preserve the ordering / tell me what's most urgent" | `cluster_health_rca` and `alert_triage_rca` findings carry an explicit 1-based `rank`, worst-first. Priority is in the payload, not implied by list position, and every finding cites the measured percentage or the raw Prism state string that tripped it. |
-| "Confirm before anything destructive" | Destructive tools (`vm_delete`, `vm_migrate`, `snapshot_delete`, `snapshot_restore`, `image_delete`, `subnet_delete`, `storage_container_delete`, `lcm_update`, `pd_failover`) take `dry_run=True` for a preview, are `risk=high`, and require a named approver (`NUTANIX_AUDIT_APPROVED_BY`). The CLI adds a double confirmation on top. |
+| "Confirm before anything destructive" | Destructive tools (`vm_delete`, `vm_migrate`, `snapshot_delete`, `snapshot_restore`, `image_delete`, `subnet_delete`, `storage_container_delete`, `lcm_update`, `pd_failover`) take `dry_run=True` for a preview and are `risk=high`, tagged `review` on the audit row. The CLI adds a double confirmation on top. |
 | "Run the LCM precheck before upgrading" | `lcm_update` **refuses** unless you hand back the `taskExtId` from `lcm_precheck` as `precheck_task_ext_id` and that task reached `SUCCEEDED`. The `dry_run` preview enforces it too, so a preview can never promise an upgrade the real call would refuse. The ordering is a guarantee, not a suggestion the model can skip. |
 | "Undo it if it goes wrong" | Reversible writes record an inverse descriptor capturing the **prior** state (power state, CPU/memory, capacity/RF, source host). `undo_list` shows them; `undo_apply` replays one through the same governed path. Irreversible deletes still record what was there: `subnet_delete` captures the subnet's name, description, type, VLAN id, cluster and IP config/pools, so a wrongly deleted subnet can be rebuilt by hand from the audit row. |
 | "Log what you did" | Every call is audited to `~/.nutanix-aiops/audit.db` regardless of what the model says it did (relocatable via `NUTANIX_AIOPS_HOME`). |
@@ -102,17 +104,20 @@ SCOPE
 
 ## Recommended setup for a local model
 
+Authorization is not this tool's job, so enforce it where it actually belongs:
+connect with a Prism Central account holding only a read-only (Viewer) role
+until you trust the setup — writes then fail at the server, not at a switch in
+this tool.
+
 ```bash
-# Read-only until you trust the setup — this is enforced, not advisory.
-export NUTANIX_READ_ONLY=1
 nutanix-aiops doctor
 ```
 
-Then, when you are ready to allow writes, unset it and set an approver so the
-high-risk tier has an accountable name on it:
+Then, when you are ready to allow writes, point the account at a role with the
+write permissions it needs, and optionally set an approver so the audit trail
+carries an accountable name:
 
 ```bash
-unset NUTANIX_READ_ONLY
 export NUTANIX_AUDIT_APPROVED_BY="your.name@example.com"
 export NUTANIX_AUDIT_RATIONALE="scheduled maintenance window 2026-07-20"
 ```

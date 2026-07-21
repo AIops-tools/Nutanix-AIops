@@ -109,7 +109,8 @@ def snapshot_delete(
 ) -> dict:
     """[WRITE][risk=high] Delete a VM snapshot. Destructive — pass dry_run=True to preview.
 
-    Requires an approver under the graduated-autonomy policy. Captures the
+    Tagged risk=high (audit tier 'review'); NUTANIX_AUDIT_APPROVED_BY /
+    NUTANIX_AUDIT_RATIONALE optionally annotate who/why. Captures the
     snapshot's prior name on the audit trail.
 
     Args:
@@ -136,7 +137,8 @@ def snapshot_restore(
     """[WRITE][risk=high] Revert a VM to a snapshot. Destructive & NOT undoable — preview first.
 
     Reverting overwrites the VM's current state; pass dry_run=True to preview.
-    Requires an approver under the policy.
+    Tagged risk=high (audit tier 'review'); NUTANIX_AUDIT_APPROVED_BY /
+    NUTANIX_AUDIT_RATIONALE optionally annotate who/why.
 
     Args:
         vm_ext_id: VM extId as returned by vm_list.
@@ -180,7 +182,9 @@ def pd_failover(
 ) -> dict:
     """[WRITE][risk=high] Fail a protection domain over to a target cluster (DR event).
 
-    Destructive DR operation; pass dry_run=True to preview. Requires an approver.
+    Destructive DR operation; pass dry_run=True to preview. Tagged risk=high
+    (audit tier 'review'); NUTANIX_AUDIT_APPROVED_BY / NUTANIX_AUDIT_RATIONALE
+    optionally annotate who/why.
 
     Args:
         policy_ext_id: Protection policy extId as returned by protection_domain_list.

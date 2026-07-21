@@ -211,8 +211,9 @@ def vm_clone(vm_ext_id: str, new_name: str, target: Optional[str] = None) -> dic
 def vm_delete(vm_ext_id: str, dry_run: bool = False, target: Optional[str] = None) -> dict:
     """[WRITE][risk=high] Delete a VM. Destructive — pass dry_run=True to preview first.
 
-    Requires an approver (set NUTANIX_AUDIT_APPROVED_BY) under the graduated-autonomy
-    policy. Captures the VM's prior name/power state on the audit trail.
+    Tagged risk=high (audit tier 'review'); NUTANIX_AUDIT_APPROVED_BY /
+    NUTANIX_AUDIT_RATIONALE optionally annotate who/why. Captures the VM's
+    prior name/power state on the audit trail.
 
     Args:
         vm_ext_id: VM extId as returned by vm_list.
@@ -238,7 +239,9 @@ def vm_migrate(
 ) -> dict:
     """[WRITE][risk=high] Live-migrate a VM to another host (reversible → prior host).
 
-    Pass dry_run=True to preview. Requires an approver under the policy.
+    Pass dry_run=True to preview. Tagged risk=high (audit tier 'review');
+    NUTANIX_AUDIT_APPROVED_BY / NUTANIX_AUDIT_RATIONALE optionally annotate
+    who/why.
 
     Args:
         vm_ext_id: VM extId as returned by vm_list.

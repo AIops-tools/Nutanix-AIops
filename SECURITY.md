@@ -37,8 +37,10 @@ Every MCP tool runs through the bundled `@governed_tool` harness
   `NUTANIX_MAX_TOOL_SECONDS`) plus an on-by-default guard that trips a tight
   poll/retry loop, preventing unbounded API consumption (e.g. polling a slow
   session).
-- **Graduated risk tiers** — `~/.nutanix-aiops/rules.yaml` `risk_tiers` gate
-  writes by environment/tag; the highest tiers require a recorded approver.
+- **Risk-tier labeling** — every audit row carries a descriptive tier derived
+  from the tool's declared `risk_level`; it labels the row for a reviewer, it
+  does not gate the call. Whether a write is permitted is the agent's
+  judgement or the connecting account's permissions, not the skill's.
 - **Undo-token recording** — reversible writes capture the entity's BEFORE state
   and record an inverse descriptor (e.g. `vm_power_on`→re-power to prior state,
   `vm_update`→restore prior CPU/memory, `vm_migrate`→migrate back to the prior
@@ -51,10 +53,12 @@ Every MCP tool runs through the bundled `@governed_tool` harness
 Destructive writes — `vm_delete`, `vm_migrate`, `storage_container_delete`,
 `subnet_delete`, `image_delete`, `snapshot_delete`, `snapshot_restore`,
 `pd_failover`, `lcm_update` — are `risk_level=high`, accept a `dry_run` preview,
-and (under `risk_tiers`) require a recorded approver (`NUTANIX_AUDIT_APPROVED_BY`
-+ `NUTANIX_AUDIT_RATIONALE`). The CLI additionally double-confirms `vm delete`
-and `vm migrate` and supports `--dry-run`. Reversible medium/low writes capture
-before-state and, where a safe inverse exists, record an undo token.
+and are tagged tier `review` on the audit row; `NUTANIX_AUDIT_APPROVED_BY` +
+`NUTANIX_AUDIT_RATIONALE` optionally annotate who authorized the call and why —
+they are never required and never block. The CLI additionally double-confirms
+`vm delete` and `vm migrate` and supports `--dry-run`. Reversible medium/low
+writes capture before-state and, where a safe inverse exists, record an undo
+token.
 
 ### SSL/TLS Verification
 `verify_ssl` defaults to true; disable only for self-signed lab certificates.

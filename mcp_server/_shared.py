@@ -115,8 +115,10 @@ mcp = FastMCP(
         "alerts by severity and surfaces the oldest unresolved). "
         "Mutations auto-handle the v4 ETag/If-Match footgun and auto-paginate. "
         "Destructive writes (delete / migrate / pool changes) are risk=high with a "
-        "dry_run preview and require an approver. Every tool runs through the "
-        "nutanix-aiops governance harness (audit / budget / risk-tier / undo)."
+        "dry_run preview. Every tool runs through the nutanix-aiops governance "
+        "harness (audit / budget / risk-tier tagging / undo); it does not decide "
+        "whether a write is permitted — that is the agent's judgement or the "
+        "connecting account's permissions."
     ),
 )
 
