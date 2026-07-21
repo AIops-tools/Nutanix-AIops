@@ -242,6 +242,29 @@ def preview_delete_vm(conn: Any, vm_ext_id: str) -> dict:
     }
 
 
+#: Which power actions run a self-lockout guard on preview — the same tuples the
+#: real actions use. power-on / reboot cannot lock the tool out, so no guard.
+_PREVIEW_REFUSALS = {"power-off": _POWER_REFUSAL, "shutdown": _SHUTDOWN_REFUSAL}
+
+
+def preview_power(conn: Any, vm_ext_id: str, action: str) -> dict:
+    """Guarded dry-run preview for a power action — reads only, changes nothing.
+
+    Runs the SAME self-lockout check as the real action (for power-off /
+    shutdown; none for power-on / reboot, which cannot lock the tool out),
+    against the same fetched record and with the same fail-open semantics. So a
+    preview of powering off Prism Central refuses exactly as the real call
+    would, instead of showing a green banner the caller then sees refused.
+    """
+    obj, _etag = _vm_raw(conn, vm_ext_id, refuse_self=_PREVIEW_REFUSALS.get(action))
+    return {
+        "action": action,
+        "extId": ext_id(obj),
+        "name": opt(obj.get("name")),
+        "powerState": opt(obj.get("powerState")),
+    }
+
+
 def migrate_vm(conn: Any, vm_ext_id: str, target_host_ext_id: str) -> dict:
     """[WRITE][high] Live-migrate a VM to another host."""
     obj, etag = _vm_raw(conn, vm_ext_id)

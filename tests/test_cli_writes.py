@@ -81,6 +81,47 @@ def test_cli_vm_delete_dry_run_reads_and_audits_but_never_writes(gov_home, monke
 
 
 @pytest.mark.unit
+def test_cli_vm_power_off_dry_run_reads_and_audits_but_never_powers(gov_home, monkeypatch):
+    """`vm power off --dry-run` now routes through the twin (was a fake banner):
+    it reads the VM to run the self-lockout guard, audits, and issues no POST."""
+    import mcp_server.tools.vms as gov_vms
+    from nutanix_aiops.cli import app
+
+    conn = _mock_vm_conn()
+    monkeypatch.setattr(gov_vms, "_get_connection", lambda target=None: conn)
+
+    result = CliRunner().invoke(app, ["vm", "power", "v1", "off", "--dry-run"])
+    assert result.exit_code == 0, result.output
+    assert "DRY-RUN" in result.output
+    conn.post.assert_not_called()  # no $actions/power-off POST
+    conn.get_with_etag.assert_called()  # it DID read, to run the guard
+    assert _audit_tools(gov_home / "audit.db") == ["vm_power_off"]
+
+
+@pytest.mark.unit
+def test_cli_vm_power_off_dry_run_on_prism_central_refuses_nonzero(gov_home, monkeypatch):
+    """The whole point of routing the power preview through the twin: a dry-run of
+    powering off Prism Central refuses, instead of a green banner then a refusal."""
+    import mcp_server.tools.vms as gov_vms
+    from nutanix_aiops.cli import app
+
+    conn = MagicMock(name="conn")
+    conn.get_with_etag.return_value = (
+        {"data": {"extId": "vm-pc", "name": "pc", "powerState": "ON",
+                  "nics": [{"networkInfo": {"ipv4Config": {"ipAddress": [
+                      {"value": "10.0.0.10"}]}}}]}},
+        "etag-1",
+    )
+    conn.target.host = "10.0.0.10"
+    monkeypatch.setattr(gov_vms, "_get_connection", lambda target=None: conn)
+
+    result = CliRunner().invoke(app, ["vm", "power", "vm-pc", "off", "--dry-run"])
+    assert result.exit_code == 1
+    assert "DRY-RUN" not in result.output
+    conn.post.assert_not_called()
+
+
+@pytest.mark.unit
 def test_cli_vm_delete_dry_run_on_prism_central_refuses_nonzero(gov_home, monkeypatch):
     """A refused preview must teach and exit non-zero, like a refused real write."""
     import mcp_server.tools.vms as gov_vms

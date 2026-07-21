@@ -15,7 +15,6 @@ from nutanix_aiops.cli._common import (
     console,
     double_confirm,
     dry_run_preview,
-    dry_run_print,
     get_connection,
     print_envelope,
 )
@@ -69,13 +68,17 @@ def vm_power(
     if action not in fns:
         raise typer.BadParameter("action must be one of: on, off, shutdown, reboot")
     if dry_run:
-        # NOT routed through the governed twin: vm_power_on/off/guest_shutdown/
-        # reboot take no dry_run parameter, so there is no preview to ask them
-        # for — calling them would perform the write this flag exists to avoid.
-        # Inventing a twin-side preview is a separate change; until then this
-        # banner stays a static description and runs no guard.
-        dry_run_print(operation=f"vm power {action}",
-                      api_call=f"POST /api/vmm/v4.0/ahv/config/vms/{vm_ext_id}/$actions/{action}")
+        # Routed through the governed twin so the preview runs the same
+        # self-lockout guard (a dry-run of powering off Prism Central refuses,
+        # not a green banner) and lands the same audit row as the real call.
+        preview = fns[action](vm_ext_id=vm_ext_id, dry_run=True, target=target)
+        would = preview.get("wouldPower") if isinstance(preview, dict) else None
+        dry_run_preview(
+            preview,
+            operation=f"vm power {action}",
+            api_call=f"POST /api/vmm/v4.0/ahv/config/vms/{vm_ext_id}/$actions/{action}",
+            parameters=would if isinstance(would, dict) else None,
+        )
         return
     console.print_json(json.dumps(fns[action](vm_ext_id=vm_ext_id, target=target)))
 

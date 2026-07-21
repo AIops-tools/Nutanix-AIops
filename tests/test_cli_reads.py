@@ -95,30 +95,6 @@ def test_cli_vm_power_rejects_bad_action(monkeypatch):
 
 
 @pytest.mark.unit
-def test_cli_vm_power_dry_run_is_a_static_banner_because_its_twin_has_no_dry_run(monkeypatch):
-    """`vm power --dry-run` is the ONE dry-run left un-routed, on purpose.
-
-    Its twins (vm_power_on/off/guest_shutdown/reboot) take no ``dry_run``
-    parameter, so there is nothing to ask them for — calling one would perform
-    the very write the flag exists to avoid. So this banner runs no guard and
-    lands no audit row, unlike every other --dry-run in this CLI.
-
-    This is a documented gap, not the line-wide rule. The rule is
-    "a dry_run MAY read; it must never write" — see test_cli_writes.py, where
-    the routed previews assert the read AND the audit row.
-    """
-    from nutanix_aiops.cli import app
-
-    conn = _patch_conn(monkeypatch, "nutanix_aiops.cli.vm")
-    result = runner.invoke(app, ["vm", "power", "v1", "on", "--dry-run"])
-    assert result.exit_code == 0, result.output
-    assert "DRY-RUN" in result.output
-    assert "power" in result.output.lower()
-    # The surviving universal half: a preview never mutates.
-    assert conn.method_calls == []
-
-
-@pytest.mark.unit
 def test_cli_overview(monkeypatch):
     from nutanix_aiops.cli import app
 

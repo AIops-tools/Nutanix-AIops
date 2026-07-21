@@ -98,53 +98,71 @@ def vm_get(vm_ext_id: str, target: Optional[str] = None) -> dict:
 @mcp.tool()
 @governed_tool(risk_level="medium", undo=_power_undo)
 @tool_errors("dict")
-def vm_power_on(vm_ext_id: str, target: Optional[str] = None) -> dict:
+def vm_power_on(vm_ext_id: str, dry_run: bool = False, target: Optional[str] = None) -> dict:
     """[WRITE][risk=medium] Power on a VM (reversible → power-off). Auto-handles ETag.
 
     Args:
         vm_ext_id: VM extId as returned by vm_list.
+        dry_run: If True, return what WOULD be powered on without doing it.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.power_on(_get_connection(target), vm_ext_id)
+    conn = _get_connection(target)
+    if dry_run:
+        return {"dryRun": True, "wouldPower": ops.preview_power(conn, vm_ext_id, "power-on")}
+    return ops.power_on(conn, vm_ext_id)
 
 
 @mcp.tool()
 @governed_tool(risk_level="medium", undo=_power_undo)
 @tool_errors("dict")
-def vm_guest_shutdown(vm_ext_id: str, target: Optional[str] = None) -> dict:
+def vm_guest_shutdown(vm_ext_id: str, dry_run: bool = False, target: Optional[str] = None) -> dict:
     """[WRITE][risk=medium] Graceful in-guest shutdown (reversible → power-on).
 
     Args:
         vm_ext_id: VM extId as returned by vm_list.
+        dry_run: If True, preview it (runs the self-lockout guard) without shutting down.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.guest_shutdown(_get_connection(target), vm_ext_id)
+    conn = _get_connection(target)
+    if dry_run:
+        return {"dryRun": True,
+                "wouldPower": ops.preview_power(conn, vm_ext_id, "shutdown")}
+    return ops.guest_shutdown(conn, vm_ext_id)
 
 
 @mcp.tool()
 @governed_tool(risk_level="medium", undo=_power_undo)
 @tool_errors("dict")
-def vm_power_off(vm_ext_id: str, target: Optional[str] = None) -> dict:
+def vm_power_off(vm_ext_id: str, dry_run: bool = False, target: Optional[str] = None) -> dict:
     """[WRITE][risk=medium] Hard power off a VM (reversible → power-on).
 
     Args:
         vm_ext_id: VM extId as returned by vm_list.
+        dry_run: If True, preview it (runs the self-lockout guard) without powering off.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.power_off(_get_connection(target), vm_ext_id)
+    conn = _get_connection(target)
+    if dry_run:
+        return {"dryRun": True,
+                "wouldPower": ops.preview_power(conn, vm_ext_id, "power-off")}
+    return ops.power_off(conn, vm_ext_id)
 
 
 @mcp.tool()
 @governed_tool(risk_level="medium")
 @tool_errors("dict")
-def vm_reboot(vm_ext_id: str, target: Optional[str] = None) -> dict:
+def vm_reboot(vm_ext_id: str, dry_run: bool = False, target: Optional[str] = None) -> dict:
     """[WRITE][risk=medium] Reboot a VM (no distinct inverse).
 
     Args:
         vm_ext_id: VM extId as returned by vm_list.
+        dry_run: If True, return what WOULD be rebooted without doing it.
         target: Prism Central target name from config; omit for the default.
     """
-    return ops.reboot_vm(_get_connection(target), vm_ext_id)
+    conn = _get_connection(target)
+    if dry_run:
+        return {"dryRun": True, "wouldPower": ops.preview_power(conn, vm_ext_id, "reboot")}
+    return ops.reboot_vm(conn, vm_ext_id)
 
 
 @mcp.tool()
