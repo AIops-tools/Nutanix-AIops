@@ -11,6 +11,7 @@ from nutanix_aiops.cli._common import (
     DryRunOption,
     LimitOption,
     TargetOption,
+    checked,
     cli_errors,
     console,
     double_confirm,
@@ -106,7 +107,7 @@ def vm_delete(
         )
         return
     double_confirm("delete VM", vm_ext_id)
-    console.print_json(json.dumps(gov.vm_delete(vm_ext_id=vm_ext_id, target=target)))
+    console.print_json(json.dumps(checked(gov.vm_delete(vm_ext_id=vm_ext_id, target=target))))
 
 
 @vm_app.command("migrate")
@@ -140,5 +141,11 @@ def vm_migrate(
         return
     double_confirm("migrate VM", vm_ext_id)
     console.print_json(json.dumps(
-        gov.vm_migrate(vm_ext_id=vm_ext_id, target_host_ext_id=target_host_ext_id, target=target)
+        checked(
+            gov.vm_migrate(
+                vm_ext_id=vm_ext_id,
+                target_host_ext_id=target_host_ext_id,
+                target=target,
+            )
+        )
     ))
