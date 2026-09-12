@@ -67,6 +67,13 @@ nutanix-aiops init       # interactive wizard: PC host/port 9440/username + encr
 nutanix-aiops doctor     # connectivity + REST-RBAC preflight
 ```
 
+Or as an OpenClaw plugin, which installs this skill and its MCP server together:
+
+```bash
+openclaw plugins install clawhub:@aiops-tools/nutanix-aiops
+openclaw skills info nutanix-aiops          # expect: Visible to model: yes
+```
+
 ## When to Use This Skill
 
 - Diagnose the estate in one shot (`diagnose cluster-health`): degraded resiliency, storage pools/containers over 80% / 90%, nodes down or missing — worst-first, each finding citing the measured number
