@@ -1,6 +1,6 @@
 {
   "name": "@aiops-tools/nutanix-aiops",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "Governed Nutanix Prism Central v4 ops: clusters/VMs/storage/DR/LCM/RCA, ETag-safe, 51 tools.",
   "private": true,
   "license": "MIT",
