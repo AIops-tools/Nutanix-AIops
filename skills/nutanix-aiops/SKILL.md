@@ -17,7 +17,7 @@ installer:
 argument-hint: "[VM/cluster extId or describe your Nutanix task]"
 allowed-tools:
   - Bash
-metadata: {"openclaw":{"requires":{"env":["NUTANIX_AIOPS_CONFIG"],"bins":["nutanix-aiops"],"config":["~/.nutanix-aiops/config.yaml","~/.nutanix-aiops/secrets.enc"]},"optional":{"env":["NUTANIX_AIOPS_MASTER_PASSWORD"]},"primaryEnv":"NUTANIX_AIOPS_CONFIG","homepage":"https://github.com/AIops-tools/Nutanix-AIops","emoji":"🧊","os":["macos","linux"]}}
+metadata: {"openclaw":{"requires":{"anyBins":["nutanix-aiops","uvx"]},"optional":{"env":["NUTANIX_AIOPS_CONFIG","NUTANIX_AIOPS_MASTER_PASSWORD"]},"homepage":"https://github.com/AIops-tools/Nutanix-AIops","emoji":"🧊","os":["macos","linux"]}}
 compatibility: >
   Standalone, self-governed Nutanix Prism Central operations. The governance harness (audit, token/runaway budget, undo, descriptive risk-tier labels) is bundled in the package — no external skill-family dependency.
   Connects to Prism Central on HTTPS :9440 with HTTP Basic auth (username + password). The v4 REST API requires an ETag/If-Match on every mutation; nutanix-aiops fetches and sends it automatically. All list tools paginate automatically; vm_list returns both AHV and ESXi VMs.

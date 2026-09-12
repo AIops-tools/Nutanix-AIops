@@ -1,0 +1,24 @@
+{
+  "id": "nutanix-aiops",
+  "name": "Nutanix AIops",
+  "description": "Governed Nutanix Prism Central v4 ops: clusters/VMs/storage/DR/LCM/RCA, ETag-safe, 51 tools.",
+  "skills": [
+    "./skills"
+  ],
+  "mcpServers": {
+    "nutanix-aiops": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "nutanix-aiops==0.11.0",
+        "nutanix-aiops-mcp"
+      ]
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

@@ -5,7 +5,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "nutanix-aiops==0.10.0",
+        "nutanix-aiops==0.11.0",
         "nutanix-aiops-mcp"
       ]
     }
