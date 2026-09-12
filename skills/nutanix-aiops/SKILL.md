@@ -70,7 +70,7 @@ nutanix-aiops doctor     # connectivity + REST-RBAC preflight
 Or as an OpenClaw plugin, which installs this skill and its MCP server together:
 
 ```bash
-openclaw plugins install clawhub:@aiops-tools/nutanix-aiops
+openclaw plugins install clawhub:@zw008/nutanix-aiops
 openclaw skills info nutanix-aiops          # expect: Visible to model: yes
 ```
 
