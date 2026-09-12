@@ -74,6 +74,8 @@ openclaw plugins install clawhub:@aiops-tools/nutanix-aiops
 openclaw skills info nutanix-aiops          # expect: Visible to model: yes
 ```
 
+Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release.
+
 ## When to Use This Skill
 
 - Diagnose the estate in one shot (`diagnose cluster-health`): degraded resiliency, storage pools/containers over 80% / 90%, nodes down or missing — worst-first, each finding citing the measured number
