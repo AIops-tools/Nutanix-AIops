@@ -11,6 +11,7 @@ from nutanix_aiops.cli._common import (
     DryRunOption,
     LimitOption,
     TargetOption,
+    audited,
     checked,
     cli_errors,
     console,
@@ -31,6 +32,7 @@ ExtIdArg = Annotated[str, typer.Argument(help="VM extId (from 'vm list')")]
 
 @vm_app.command("list")
 @cli_errors
+@audited
 def vm_list(
     include_esxi: Annotated[bool, typer.Option("--esxi/--no-esxi")] = True,
     limit: LimitOption = 500,
@@ -45,6 +47,7 @@ def vm_list(
 
 @vm_app.command("get")
 @cli_errors
+@audited
 def vm_get(vm_ext_id: ExtIdArg, target: TargetOption = None) -> None:
     """Show one VM (with its ETag)."""
     from nutanix_aiops.ops import vms as ops

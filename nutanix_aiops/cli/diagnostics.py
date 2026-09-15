@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 from rich.table import Table
 
-from nutanix_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from nutanix_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 diagnose_app = typer.Typer(
     name="diagnose",
@@ -35,6 +35,7 @@ def _print_findings(findings: list[dict]) -> None:
 
 @diagnose_app.command("cluster-health")
 @cli_errors
+@audited
 def diagnose_cluster_health(target: TargetOption = None) -> None:
     """Estate health: resiliency state, storage headroom, nodes down (worst first)."""
     from nutanix_aiops.ops import clusters as cl
@@ -57,6 +58,7 @@ def diagnose_cluster_health(target: TargetOption = None) -> None:
 
 @diagnose_app.command("alert-triage")
 @cli_errors
+@audited
 def diagnose_alert_triage(target: TargetOption = None) -> None:
     """Triage active alerts: per-severity counts and the oldest unresolved one."""
     from nutanix_aiops.ops import alerts as al

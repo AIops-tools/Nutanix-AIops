@@ -10,6 +10,7 @@ import typer
 from nutanix_aiops.cli._common import (
     LimitOption,
     TargetOption,
+    audited,
     cli_errors,
     console,
     get_connection,
@@ -27,6 +28,7 @@ ExtIdArg = Annotated[str, typer.Argument(help="Cluster extId (from 'cluster list
 
 @cluster_app.command("list")
 @cli_errors
+@audited
 def cluster_list(limit: LimitOption = 500, target: TargetOption = None) -> None:
     """List registered clusters."""
     from nutanix_aiops.ops import clusters as ops
@@ -37,6 +39,7 @@ def cluster_list(limit: LimitOption = 500, target: TargetOption = None) -> None:
 
 @cluster_app.command("health")
 @cli_errors
+@audited
 def cluster_health(cluster_ext_id: ExtIdArg, target: TargetOption = None) -> None:
     """Show one cluster's health summary."""
     from nutanix_aiops.ops import clusters as ops
@@ -47,6 +50,7 @@ def cluster_health(cluster_ext_id: ExtIdArg, target: TargetOption = None) -> Non
 
 @cluster_app.command("hosts")
 @cli_errors
+@audited
 def cluster_hosts(limit: LimitOption = 500, target: TargetOption = None) -> None:
     """List hosts across all clusters."""
     from nutanix_aiops.ops import clusters as ops
@@ -57,6 +61,7 @@ def cluster_hosts(limit: LimitOption = 500, target: TargetOption = None) -> None
 
 @cluster_app.command("util")
 @cli_errors
+@audited
 def cluster_util(cluster_ext_id: ExtIdArg, target: TargetOption = None) -> None:
     """Show a cluster's CPU/memory/storage/IOPS utilization."""
     from nutanix_aiops.ops import clusters as ops
