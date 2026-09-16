@@ -20,7 +20,7 @@ with, or the agent's own prompt. What the harness does guarantee:
 | "Don't invent a value when a field is missing" | A field Prism Central did not return comes back as `null`, never as `""`. Absent and empty are distinguishable in the payload — which matters here, because v4 omits a great many fields (`description`, `hypervisorType`, host and cluster names, LCM version strings, alert `impactType`). |
 | "Tell me if the output was cut off" | Every list tool returns `{"<items>": [...], "returned": N, "limit": L, "truncated": true/false}`. Truncation is **measured** (one extra row is fetched), not guessed from a length coincidence. `vm_list`, `cluster_list`, `host_list`, `alert_list`, `event_list`, `audit_list`, `task_list`, `image_list`, `category_list`, `subnet_list`, `snapshot_list`, `recovery_point_list`, `protection_domain_list`, `storage_container_list`, `lcm_inventory` and `undo_list` all take a `limit` and report against it. |
 | "Preserve the ordering / tell me what's most urgent" | `cluster_health_rca` and `alert_triage_rca` findings carry an explicit 1-based `rank`, worst-first. Priority is in the payload, not implied by list position, and every finding cites the measured percentage or the raw Prism state string that tripped it. |
-| "Confirm before anything destructive" | Destructive tools (`vm_delete`, `vm_migrate`, `snapshot_delete`, `snapshot_restore`, `image_delete`, `subnet_delete`, `storage_container_delete`, `lcm_update`, `pd_failover`) take `dry_run=True` for a preview and are `risk=high`, tagged `review` on the audit row. The CLI adds a double confirmation on top. |
+| "Confirm before anything destructive" | Destructive tools (`vm_delete`, `vm_migrate`, `snapshot_delete`, `snapshot_restore`, `image_delete`, `subnet_delete`, `storage_container_delete`, `lcm_update`, `pd_failover`) take `dry_run=True` for a preview and are `risk=high`, tagged `review` on the audit row. ⚠️ **The CLI double confirmation exists only for `vm_delete` and `vm_migrate`** — the other seven have no CLI command and are reachable only over MCP, where nothing prompts. Keep your own confirmation for those. |
 | "Run the LCM precheck before upgrading" | `lcm_update` **refuses** unless you hand back the `taskExtId` from `lcm_precheck` as `precheck_task_ext_id` and that task reached `SUCCEEDED`. The `dry_run` preview enforces it too, so a preview can never promise an upgrade the real call would refuse. The ordering is a guarantee, not a suggestion the model can skip. |
 | "Undo it if it goes wrong" | Reversible writes record an inverse descriptor capturing the **prior** state (power state, CPU/memory, capacity/RF, source host). `undo_list` shows them; `undo_apply` replays one through the same governed path. Irreversible deletes still record what was there: `subnet_delete` captures the subnet's name, description, type, VLAN id, cluster and IP config/pools, so a wrongly deleted subnet can be rebuilt by hand from the audit row. |
 | "Log what you did" | Every call is audited to `~/.nutanix-aiops/audit.db` regardless of what the model says it did (relocatable via `NUTANIX_AIOPS_HOME`). |
@@ -68,6 +68,10 @@ WRITES
   would change before running it for real.
 - Async writes return a task extId, not a result. Poll task_list for its status
   rather than assuming the operation finished.
+
+- Only `vm_delete` and `vm_migrate` have CLI commands. The other seven destructive tools
+  are MCP-only and nothing will ask you to confirm them: call with `dry_run=True` first,
+  show the operator what would change, and wait for an explicit go-ahead.
 
 SCOPE
 - Separate observation from interpretation. State what the tools returned, then

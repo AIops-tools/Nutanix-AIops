@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- The "confirm before anything destructive" row said "the CLI adds a double confirmation on
+  top" for nine tools; only `vm_delete` and `vm_migrate` have CLI commands. The other
+  seven — including `snapshot_delete`, `subnet_delete` and `pd_failover` — are reachable
+  only over MCP, where there is no confirmation step. Corrected, and the copyable system
+  prompt now asks the model to confirm them itself.
+
 ## v0.11.3 — 2026-09-15
 
 ### Fixed
