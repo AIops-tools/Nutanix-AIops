@@ -39,8 +39,11 @@ def fleet_overview(conn: Any) -> dict:
         except Exception as exc:  # noqa: BLE001 — collect, keep going
             errors.append(f"{label}: {str(exc)[:120]}")
             return []
-        if result.get("truncated"):
+        if result.get("truncated") is not False:
+            # True = capped; None = completeness unknown (a sub-read failed).
             truncated.append(label)
+        if result.get("esxiError"):
+            errors.append(f"{label} (ESXi): {str(result['esxiError'])[:120]}")
         return result.get(key, [])
 
     clusters = _safe(cl.list_clusters, "clusters", "clusters")

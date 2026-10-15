@@ -79,7 +79,7 @@ def test_ops_keep_empty_string_when_source_is_empty():
     """An explicitly empty upstream value is preserved as '' — not turned into null."""
     conn = MagicMock(name="conn")
     conn.list_all.return_value = [{"extId": "vm-1", "name": "", "powerState": ""}]
-    (row,) = vm.list_vms(conn)["vms"]
+    (row,) = vm.list_vms(conn, include_esxi=False)["vms"]
     assert row["name"] == ""
     assert row["powerState"] == ""
 
@@ -93,7 +93,7 @@ def test_ops_never_drop_the_key_itself():
     """
     conn = MagicMock(name="conn")
     conn.list_all.return_value = [{}]
-    (row,) = vm.list_vms(conn)["vms"]
+    (row,) = vm.list_vms(conn, include_esxi=False)["vms"]
     for key in ("extId", "name", "powerState", "hypervisor", "numSockets",
                 "memoryBytes", "clusterExtId", "hostExtId", "ipAddresses"):
         assert key in row, f"{key} must be present even when the source omitted it"
@@ -128,7 +128,7 @@ def test_truncation_is_measured_not_guessed():
     """limit+1 rows are fetched, so ``truncated`` is observed rather than inferred."""
     conn = MagicMock(name="conn")
     conn.list_all.return_value = [{"extId": f"vm-{i}"} for i in range(4)]
-    result = vm.list_vms(conn, limit=3)
+    result = vm.list_vms(conn, include_esxi=False, limit=3)
     assert result["returned"] == 3, "only `limit` rows are returned"
     assert result["limit"] == 3
     assert result["truncated"] is True
@@ -140,7 +140,7 @@ def test_an_exactly_full_page_is_not_reported_as_truncated():
     """The length coincidence a bare list forces a consumer to guess from."""
     conn = MagicMock(name="conn")
     conn.list_all.return_value = [{"extId": f"vm-{i}"} for i in range(3)]
-    result = vm.list_vms(conn, limit=3)
+    result = vm.list_vms(conn, include_esxi=False, limit=3)
     assert result["returned"] == 3
     assert result["truncated"] is False
 
@@ -150,12 +150,15 @@ def test_every_list_envelope_carries_the_same_four_keys():
     conn = MagicMock(name="conn")
     conn.list_all.return_value = [{"extId": "x"}]
     for result, key in (
-        (vm.list_vms(conn), "vms"),
+        (vm.list_vms(conn, include_esxi=False), "vms"),
         (cl.list_clusters(conn), "clusters"),
         (cl.list_hosts(conn), "hosts"),
     ):
         assert set(result) == {key, "returned", "limit", "truncated"}
         assert result["returned"] == len(result[key])
+    # The two-endpoint VM read adds exactly one documented key: why ESXi is missing.
+    both = vm.list_vms(conn, include_esxi=True)
+    assert set(both) == {"vms", "returned", "limit", "truncated", "esxiError"}
 
 
 @pytest.mark.unit

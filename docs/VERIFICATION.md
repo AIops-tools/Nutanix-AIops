@@ -107,7 +107,17 @@ These need live attention first, because the mock suite can say least about them
 
 - `lcm_update` (LCM firmware/software upgrade) and `lcm_precheck`
 - `pd_failover` (protection-domain failover)
-- **ESXi**-backed VM listing under Prism Central
+- **ESXi**-backed VM listing under Prism Central. Before 2026-10-15 this listing could not have
+  worked: only the AHV endpoint was read, and the hypervisor label came from `source.entityType`
+  (a clone-source field). It now reads `/api/vmm/v4.0/esxi/config/vms` — path and field names taken
+  from Nutanix's own `ntnx-vmm-py-client` (4.0.1 and 4.3.2), not live-verified. Check: ESXi rows
+  appear with `hypervisor: ESXi` and `numCpus`; a cloned AHV VM still reads `AHV`; on a PC without
+  ESXi the read returns empty rather than `esxiError`.
+  ⚠️ **Must check before trusting the default**: `include_esxi=True` is the default, so on a
+  pure-AHV Prism Central the ESXi call is made on every `vm_list` / `fleet_overview`. If that
+  endpoint answers 404 (no ESXi surface on that PC build) instead of an empty list, every call
+  carries `esxiError` and `truncated: null` and the overview lists `vms` as incomplete — a
+  permanent false alarm. Do not special-case 404 until a live PC shows which it returns.
 - Snapshot / recovery-point restore (`snapshot_restore`)
 
 ## Recording the result

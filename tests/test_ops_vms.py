@@ -1,7 +1,7 @@
 """Unit tests for the VM inventory + lifecycle ops module.
 
 No real Prism Central — the connection is a MagicMock. Proves NIC/IP extraction
-and the AHV-vs-ESXi hypervisor fold, the ``include_esxi`` filter, that ``get_vm``
+the hypervisor label taken from the endpoint a VM came from, the ESXi read, that ``get_vm``
 surfaces the ETag and raises KeyError on an empty payload, and that every write
 sends the fetched ETag as If-Match and captures the right BEFORE-state into
 ``priorState`` for a faithful undo/audit trail.
@@ -43,28 +43,87 @@ def test_norm_vm_extracts_nic_ips_and_cluster_host_refs():
             ],
         }
     ]
-    (row,) = ops.list_vms(conn)["vms"]
+    (row,) = ops.list_vms(conn, include_esxi=False)["vms"]
     assert conn.list_all.call_args[0][0] == _VMS
     assert row["extId"] == "vm-1"
-    assert row["hypervisor"] == "AHV"  # default when no hypervisorType/source
+    assert row["hypervisor"] == "AHV"  # it came from the AHV endpoint
     assert row["clusterExtId"] == "cl-1"
     assert row["hostExtId"] == "h-1"
     assert row["ipAddresses"] == ["10.0.0.5"]  # blank value dropped
 
 
-@pytest.mark.unit
-def test_list_vms_include_esxi_false_filters_out_esxi_backed_vms():
-    conn = MagicMock(name="conn")
-    conn.list_all.return_value = [
-        {"extId": "vm-ahv", "name": "a", "hypervisorType": "AHV"},
-        {"extId": "vm-esxi", "name": "b", "source": {"entityType": "ESXi"}},
-    ]
-    all_rows = ops.list_vms(conn, include_esxi=True)["vms"]
-    assert {r["extId"] for r in all_rows} == {"vm-ahv", "vm-esxi"}
+_ESXI = "/api/vmm/v4.0/esxi/config/vms"
 
-    ahv_only = ops.list_vms(conn, include_esxi=False)["vms"]
-    assert [r["extId"] for r in ahv_only] == ["vm-ahv"]
-    assert ahv_only[0]["hypervisor"] == "AHV"
+
+def _by_path(ahv, esxi):
+    """list_all fake that answers per endpoint, like Prism Central does."""
+
+    def fake(path, params=None, max_items=None):
+        rows = ahv if path == _VMS else esxi if path == _ESXI else None
+        if rows is None:
+            raise KeyError(path)
+        if isinstance(rows, Exception):
+            raise rows
+        return list(rows)[: max_items or None]
+
+    return fake
+
+
+@pytest.mark.unit
+def test_cloned_ahv_vm_stays_ahv_and_survives_the_esxi_filter():
+    # v4 `source.entityType` is VM | VM_RECOVERY_POINT: what the VM was cloned
+    # from, never its hypervisor. A clone must not be relabelled or dropped.
+    conn = MagicMock(name="conn")
+    conn.list_all.side_effect = _by_path(
+        [{"extId": "vm-clone", "name": "c", "source": {"entityType": "VM", "extId": "x"}}], []
+    )
+    rows = ops.list_vms(conn, include_esxi=False)["vms"]
+    assert [(r["extId"], r["hypervisor"]) for r in rows] == [("vm-clone", "AHV")]
+
+
+@pytest.mark.unit
+def test_include_esxi_reads_the_esxi_endpoint_and_labels_by_source():
+    conn = MagicMock(name="conn")
+    conn.list_all.side_effect = _by_path(
+        [{"extId": "vm-ahv", "name": "a"}],
+        [{"extId": "vm-esx", "name": "b", "numCpus": 4, "numCoresPerSocket": 2}],
+    )
+    out = ops.list_vms(conn, include_esxi=True)
+    by_id = {r["extId"]: r for r in out["vms"]}
+    assert by_id["vm-ahv"]["hypervisor"] == "AHV"
+    assert by_id["vm-esx"]["hypervisor"] == "ESXi"
+    assert by_id["vm-esx"]["numCpus"] == 4
+    assert by_id["vm-esx"]["ipAddresses"] is None  # not read for ESXi, not "none"
+    assert out["truncated"] is False and out["esxiError"] is None
+
+
+@pytest.mark.unit
+def test_include_esxi_false_never_queries_esxi():
+    conn = MagicMock(name="conn")
+    conn.list_all.side_effect = _by_path([{"extId": "vm-ahv"}], RuntimeError("must not call"))
+    out = ops.list_vms(conn, include_esxi=False)
+    assert [c.args[0] for c in conn.list_all.call_args_list] == [_VMS]
+    assert "esxiError" not in out
+
+
+@pytest.mark.unit
+def test_esxi_read_failure_is_reported_not_read_as_no_esxi_vms():
+    conn = MagicMock(name="conn")
+    conn.list_all.side_effect = _by_path([{"extId": "vm-ahv"}], RuntimeError("404 not found"))
+    out = ops.list_vms(conn, include_esxi=True)
+    assert [r["extId"] for r in out["vms"]] == ["vm-ahv"]
+    assert "404" in out["esxiError"]
+    assert out["truncated"] is None  # completeness unknown
+
+
+@pytest.mark.unit
+def test_combined_listing_is_capped_and_says_so():
+    conn = MagicMock(name="conn")
+    conn.list_all.side_effect = _by_path(
+        [{"extId": f"a{i}"} for i in range(3)], [{"extId": f"e{i}"} for i in range(3)]
+    )
+    out = ops.list_vms(conn, include_esxi=True, limit=4)
+    assert out["returned"] == 4 and out["truncated"] is True
 
 
 @pytest.mark.unit
@@ -452,3 +511,16 @@ def test_resolution_timeout_does_not_block_the_caller(monkeypatch):
     started = time.monotonic()
     assert guard.target_addresses(_pc_conn({}, host="blackhole.lab.local")) == set()
     assert time.monotonic() - started < 5, "resolution was not actually bounded"
+
+
+@pytest.mark.unit
+def test_cli_states_a_partial_vm_list_in_plain_language():
+    from nutanix_aiops.cli import _common
+
+    with _common.console.capture() as cap:
+        _common.print_envelope(
+            {"vms": [], "returned": 0, "limit": 5, "truncated": None, "esxiError": "403"}, "vms"
+        )
+    text = cap.get()
+    assert "completeness unknown" in text
+    assert "ESXi VMs could not be read" in text

@@ -40,6 +40,16 @@ def print_envelope(result: dict, key: str) -> None:
             f"{result.get('limit')} {key} shown — output truncated, re-run with "
             f"a higher --limit to see the rest.[/]"
         )
+    elif result.get("truncated") is None and "truncated" in result:
+        console.print(
+            f"[yellow]… completeness unknown: part of the {key} inventory could not "
+            f"be read, so this list may be missing rows.[/]"
+        )
+    if result.get("esxiError"):
+        console.print(
+            f"[yellow]… ESXi VMs could not be read ({result['esxiError']}); only "
+            f"AHV VMs are shown.[/]"
+        )
 
 
 def _cli_error_types() -> tuple[type[BaseException], ...]:

@@ -331,12 +331,13 @@ def test_fleet_overview_rolls_up_counts_and_spreads():
             return [{"extId": "cl-1", "name": "c"}]
         if path.endswith("/hosts"):
             return [{"extId": "h-1"}, {"extId": "h-2"}]
-        if path.endswith("/vms"):
+        if path.endswith("/ahv/config/vms"):
             return [
-                {"extId": "v1", "powerState": "ON", "hypervisorType": "AHV"},
-                {"extId": "v2", "powerState": "OFF", "hypervisorType": "AHV"},
-                {"extId": "v3", "powerState": "ON", "source": {"entityType": "ESXi"}},
+                {"extId": "v1", "powerState": "ON"},
+                {"extId": "v2", "powerState": "OFF", "source": {"entityType": "VM"}},
             ]
+        if path.endswith("/esxi/config/vms"):
+            return [{"extId": "v3", "powerState": "ON", "numCpus": 2}]
         return []
 
     conn.list_all.side_effect = _list_all
@@ -347,6 +348,23 @@ def test_fleet_overview_rolls_up_counts_and_spreads():
     assert out["hypervisorSpread"] == {"AHV": 2, "ESXi": 1}
     assert out["powerStateSpread"]["ON"] == 2
     assert out["errors"] == []
+
+
+def test_fleet_overview_surfaces_an_unreadable_esxi_inventory():
+    from nutanix_aiops.ops import overview as ops
+
+    conn = MagicMock(name="conn")
+
+    def _list_all(path, **_kw):
+        if path.endswith("/esxi/config/vms"):
+            raise RuntimeError("403 forbidden")
+        return [{"extId": "v1", "powerState": "ON"}] if path.endswith("/vms") else []
+
+    conn.list_all.side_effect = _list_all
+    out = ops.fleet_overview(conn)
+    assert out["vms"] == 1
+    assert any("ESXi" in e and "403" in e for e in out["errors"])
+    assert "vms" in out["truncated"], "an unknown ESXi count must not read as complete"
 
 
 @pytest.mark.unit

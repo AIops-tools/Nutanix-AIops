@@ -70,6 +70,10 @@ def vm_list(
 ) -> dict:
     """[READ] List VMs — AHV and (by default) ESXi-backed too; hypervisor field distinguishes.
 
+    AHV and ESXi are read from separate endpoints. If the ESXi read fails, the
+    AHV rows are still returned with `esxiError` set and `truncated: null`
+    (completeness unknown) — a partial list, not "no ESXi VMs".
+
     Args:
         include_esxi: Include ESXi-backed VMs Prism Central can see (default True).
         limit: Max rows to return (default 500). The result reports

@@ -7,8 +7,12 @@ capture the VM's BEFORE state into ``priorState`` so the harness can record a
 faithful undo (e.g. re-power, restore the prior CPU/memory).
 
 ``list_vms`` surfaces BOTH AHV and ESXi-backed VMs (Prism Central sees both in
-hypervisor-migration estates); the ``hypervisor`` field distinguishes them so
-an agent isn't blind to the half of the estate still on ESXi.
+hypervisor-migration estates). They live behind two separate v4 endpoints, and
+the ``hypervisor`` field records which one a row came from. It is never derived
+from the record: the AHV model has no hypervisor field, and its
+``source.entityType`` (``VM`` / ``VM_RECOVERY_POINT``) names what the VM was
+cloned from — reading it as a hypervisor relabelled every clone and let
+``include_esxi=False`` drop it.
 
 Prism Central is itself a VM and appears in that inventory like any other, so
 the destructive paths (power-off, guest shutdown, delete) refuse to act on it —
@@ -24,6 +28,7 @@ from nutanix_aiops.ops._util import (
     DEFAULT_LIST_LIMIT,
     _seg,
     as_obj,
+    clamp_limit,
     envelope,
     ext_id,
     fetch_page,
@@ -32,25 +37,31 @@ from nutanix_aiops.ops._util import (
 )
 
 _VMS = "/api/vmm/v4.0/ahv/config/vms"
+_ESXI_VMS = "/api/vmm/v4.0/esxi/config/vms"
 
 
-def _norm_vm(raw: dict) -> dict:
-    """Fold one raw VM record into the stable inventory shape."""
+def _norm_vm(raw: dict, hypervisor: str = "AHV") -> dict:
+    """Fold one raw VM record into the stable inventory shape.
+
+    ``hypervisor`` is the endpoint the record was read from. ESXi records carry
+    ``numCpus`` instead of sockets and their NICs are not parsed here, so
+    ``ipAddresses`` is ``None`` (not read) rather than an empty list.
+    """
     cluster = raw.get("cluster") or {}
     host = raw.get("host") or {}
-    ips = vm_ips(raw)
-    hypervisor = raw.get("hypervisorType") or (raw.get("source") or {}).get("entityType") or "AHV"
+    is_ahv = hypervisor == "AHV"
     return {
         "extId": ext_id(raw),
         "name": opt(raw.get("name")),
         "powerState": opt(raw.get("powerState")),
-        "hypervisor": s(hypervisor),
+        "hypervisor": hypervisor,
         "numSockets": raw.get("numSockets"),
         "numCoresPerSocket": raw.get("numCoresPerSocket"),
+        "numCpus": raw.get("numCpus"),
         "memoryBytes": raw.get("memorySizeBytes"),
         "clusterExtId": opt(cluster.get("extId")),
         "hostExtId": opt(host.get("extId")),
-        "ipAddresses": ips,
+        "ipAddresses": vm_ips(raw) if is_ahv else None,
     }
 
 
@@ -59,15 +70,29 @@ def list_vms(
 ) -> dict:
     """[READ] VMs (AHV + ESXi), normalised, in a truncation-aware envelope.
 
-    Set ``include_esxi=False`` to return only AHV-native VMs. Note the ESXi
-    filter is applied *after* the page is fetched, so ``returned`` can be lower
-    than ``limit`` while ``truncated`` is still true.
+    AHV and ESXi VMs are read from their own endpoints; ``include_esxi=False``
+    skips the ESXi read. With both, AHV rows come first and the combined list is
+    capped at ``limit``. If the ESXi read fails, the AHV rows are still returned,
+    ``esxiError`` says why, and ``truncated`` is ``null`` because completeness is
+    unknown — an unreadable ESXi inventory is not an empty one.
     """
     raw, truncated = fetch_page(conn, _VMS, limit)
     rows = [_norm_vm(r) for r in raw]
     if not include_esxi:
-        rows = [r for r in rows if (r["hypervisor"] or "").upper() == "AHV"]
-    return envelope("vms", rows, limit, truncated)
+        return envelope("vms", rows, limit, truncated)
+    try:
+        esxi_raw, esxi_truncated = fetch_page(conn, _ESXI_VMS, limit)
+    except Exception as exc:  # noqa: BLE001 — reported in the payload, not swallowed
+        result = envelope("vms", rows, limit, truncated)
+        result["truncated"] = True if truncated else None
+        result["esxiError"] = s(f"{type(exc).__name__}: {exc}")
+        return result
+    combined = rows + [_norm_vm(r, "ESXi") for r in esxi_raw]
+    capped = combined[: clamp_limit(limit)]
+    over = truncated or esxi_truncated or len(combined) > len(capped)
+    result = envelope("vms", capped, limit, over)
+    result["esxiError"] = None
+    return result
 
 
 def get_vm(conn: Any, vm_ext_id: str) -> dict:

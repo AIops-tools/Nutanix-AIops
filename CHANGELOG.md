@@ -12,6 +12,17 @@
   level is published in `_meta` under `io.github.AIops-tools/riskLevel`. These
   are hints for the client; audit and undo are unchanged.
 
+### Fixed
+- `vm_list` / `fleet_overview`: ESXi VMs were never returned and cloned AHV VMs
+  were mislabelled. The hypervisor was read from `source.entityType`, which in the
+  v4 model names what a VM was cloned from (`VM` / `VM_RECOVERY_POINT`), so every
+  clone was reported with hypervisor `VM` and `include_esxi=False` dropped it.
+  ESXi VMs are now read from their own endpoint (`/api/vmm/v4.0/esxi/config/vms`)
+  and labelled by the endpoint they came from. If the ESXi read fails, the AHV rows
+  are still returned with `esxiError` set and `truncated: null`, and
+  `fleet_overview` reports it in `errors` instead of counting zero ESXi VMs.
+  ESXi rows carry `numCpus`, and their `ipAddresses` is `null` because it is not read.
+
 ## v0.11.4 — 2026-09-17
 
 ### Fixed
