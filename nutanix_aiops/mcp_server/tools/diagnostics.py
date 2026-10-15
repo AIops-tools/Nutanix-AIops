@@ -9,8 +9,8 @@ the connection lives.
 
 from typing import Optional
 
-from mcp_server._shared import _get_connection, mcp, tool_errors
 from nutanix_aiops.governance import governed_tool
+from nutanix_aiops.mcp_server._shared import _get_connection, mcp, tool_errors
 from nutanix_aiops.ops import alerts as al
 from nutanix_aiops.ops import clusters as cl
 from nutanix_aiops.ops import diagnostics as diag

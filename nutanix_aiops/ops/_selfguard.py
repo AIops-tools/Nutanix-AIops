@@ -161,7 +161,7 @@ def is_prism_central(conn: Any, raw: dict) -> str:
 def refuse_self_lockout(conn: Any, vm_ext_id: str, raw: dict, verb: str, cost: str) -> None:
     """Raise :class:`SelfLockout` when ``raw`` is the Prism Central being talked to.
 
-    Keep ``cost`` short. ``mcp_server._shared._safe_error`` truncates a
+    Keep ``cost`` short. ``nutanix_aiops.mcp_server._shared._safe_error`` truncates a
     passed-through ValueError at ``_ERROR_MAX``, and the remedy sentence is the
     last thing in the message — an over-long ``cost`` truncates away the very
     instruction the caller needs. These messages are held to 300 characters,

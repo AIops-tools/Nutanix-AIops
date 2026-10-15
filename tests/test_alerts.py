@@ -52,7 +52,7 @@ def test_acknowledge_alert_captures_prior_state_and_posts_with_etag():
 
 @pytest.mark.unit
 def test_write_tools_have_correct_risk_tiers():
-    from mcp_server.tools import alerts as a
+    from nutanix_aiops.mcp_server.tools import alerts as a
 
     assert a.alert_acknowledge._risk_level == "medium"
     assert a.alert_resolve._risk_level == "medium"

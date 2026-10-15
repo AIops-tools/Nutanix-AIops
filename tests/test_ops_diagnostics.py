@@ -261,7 +261,7 @@ def test_alert_triage_does_not_mutate_its_inputs():
 
 @pytest.mark.unit
 def test_mcp_cluster_health_rca_is_governed_and_collects_estate(monkeypatch):
-    from mcp_server.tools import diagnostics as d
+    from nutanix_aiops.mcp_server.tools import diagnostics as d
 
     assert d.cluster_health_rca._is_governed_tool is True
     assert d.cluster_health_rca._risk_level == "low"
@@ -298,7 +298,7 @@ def test_mcp_cluster_health_rca_is_governed_and_collects_estate(monkeypatch):
 
 @pytest.mark.unit
 def test_mcp_alert_triage_rca_is_governed_and_collects_alerts(monkeypatch):
-    from mcp_server.tools import diagnostics as d
+    from nutanix_aiops.mcp_server.tools import diagnostics as d
 
     assert d.alert_triage_rca._is_governed_tool is True
     assert d.alert_triage_rca._risk_level == "low"

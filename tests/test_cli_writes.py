@@ -1,7 +1,7 @@
 """CLI confirmed-write path — past dry-run, through governance, onto disk.
 
 The CLI write commands delegate real execution to the ``@governed_tool``
-functions in ``mcp_server.tools``. These tests drive a write command PAST the
+functions in ``nutanix_aiops.mcp_server.tools``. These tests drive a write command PAST the
 dry-run branch and the double-confirm prompts and assert the call really went
 through the governed path (audit row on disk) — the regression test for the
 "CLI writes were unaudited" line-wide fix.
@@ -62,7 +62,7 @@ def test_cli_vm_delete_dry_run_reads_and_audits_but_never_writes(gov_home, monke
     the CLI silently not auditing was the outlier), and only the MUTATING call
     is forbidden.
     """
-    import mcp_server.tools.vms as gov_vms
+    import nutanix_aiops.mcp_server.tools.vms as gov_vms
     from nutanix_aiops.cli import app
 
     # Harmless audit annotation — the harness does not gate on it.
@@ -84,7 +84,7 @@ def test_cli_vm_delete_dry_run_reads_and_audits_but_never_writes(gov_home, monke
 def test_cli_vm_power_off_dry_run_reads_and_audits_but_never_powers(gov_home, monkeypatch):
     """`vm power off --dry-run` now routes through the twin (was a fake banner):
     it reads the VM to run the self-lockout guard, audits, and issues no POST."""
-    import mcp_server.tools.vms as gov_vms
+    import nutanix_aiops.mcp_server.tools.vms as gov_vms
     from nutanix_aiops.cli import app
 
     conn = _mock_vm_conn()
@@ -102,7 +102,7 @@ def test_cli_vm_power_off_dry_run_reads_and_audits_but_never_powers(gov_home, mo
 def test_cli_vm_power_off_dry_run_on_prism_central_refuses_nonzero(gov_home, monkeypatch):
     """The whole point of routing the power preview through the twin: a dry-run of
     powering off Prism Central refuses, instead of a green banner then a refusal."""
-    import mcp_server.tools.vms as gov_vms
+    import nutanix_aiops.mcp_server.tools.vms as gov_vms
     from nutanix_aiops.cli import app
 
     conn = MagicMock(name="conn")
@@ -124,7 +124,7 @@ def test_cli_vm_power_off_dry_run_on_prism_central_refuses_nonzero(gov_home, mon
 @pytest.mark.unit
 def test_cli_vm_delete_dry_run_on_prism_central_refuses_nonzero(gov_home, monkeypatch):
     """A refused preview must teach and exit non-zero, like a refused real write."""
-    import mcp_server.tools.vms as gov_vms
+    import nutanix_aiops.mcp_server.tools.vms as gov_vms
     from nutanix_aiops.cli import app
 
     monkeypatch.setenv("NUTANIX_AUDIT_APPROVED_BY", "tester")
@@ -152,7 +152,7 @@ def test_cli_vm_delete_confirmed_goes_through_governance(gov_home, monkeypatch):
     from nutanix_aiops.cli import app
 
     conn = _mock_vm_conn()
-    import mcp_server.tools.vms as gov_vms
+    import nutanix_aiops.mcp_server.tools.vms as gov_vms
 
     monkeypatch.setattr(gov_vms, "_get_connection", lambda target=None: conn)
     result = CliRunner().invoke(app, ["vm", "delete", "v1"], input="y\ny\n")
@@ -169,7 +169,7 @@ def test_cli_vm_migrate_dry_run_reads_and_audits_but_never_writes(gov_home, monk
     VM to resolve the current host) rather than from a hand-written string that
     could drift from what the migrate would really do.
     """
-    import mcp_server.tools.vms as gov_vms
+    import nutanix_aiops.mcp_server.tools.vms as gov_vms
     from nutanix_aiops.cli import app
 
     monkeypatch.setenv("NUTANIX_AUDIT_APPROVED_BY", "tester")
@@ -194,7 +194,7 @@ def test_cli_vm_migrate_dry_run_reads_and_audits_but_never_writes(gov_home, monk
 @pytest.mark.unit
 def test_cli_vm_migrate_dry_run_refusal_exits_nonzero(gov_home, monkeypatch):
     """A preview that the twin refuses must not print a green banner."""
-    import mcp_server.tools.vms as gov_vms
+    import nutanix_aiops.mcp_server.tools.vms as gov_vms
     from nutanix_aiops.cli import app
     from nutanix_aiops.connection import NutanixApiError
 
@@ -215,7 +215,7 @@ def test_cli_vm_delete_aborts_without_double_confirm(gov_home, monkeypatch):
     from nutanix_aiops.cli import app
 
     conn = _mock_vm_conn()
-    import mcp_server.tools.vms as gov_vms
+    import nutanix_aiops.mcp_server.tools.vms as gov_vms
 
     monkeypatch.setattr(gov_vms, "_get_connection", lambda target=None: conn)
     result = CliRunner().invoke(app, ["vm", "delete", "v1"], input="y\nn\n")

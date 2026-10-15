@@ -65,7 +65,7 @@ def test_capacity_runway_insufficient_data_without_growth():
 
 @pytest.mark.unit
 def test_both_tools_are_read_only_and_governed():
-    from mcp_server.tools import capacity
+    from nutanix_aiops.mcp_server.tools import capacity
 
     assert capacity.task_list._risk_level == "low"
     assert capacity.capacity_runway._risk_level == "low"

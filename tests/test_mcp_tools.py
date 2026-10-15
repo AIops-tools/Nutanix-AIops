@@ -39,7 +39,7 @@ def gov_home(tmp_path, monkeypatch):
 
 @pytest.mark.unit
 def test_power_undo_inverts_prior_state():
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     on = gov._power_undo({"vm_ext_id": "v1"}, {"priorState": {"powerState": "ON"}})
     assert on["tool"] == "vm_power_on" and on["params"]["vm_ext_id"] == "v1"
@@ -54,7 +54,7 @@ def test_power_undo_inverts_prior_state():
 
 @pytest.mark.unit
 def test_update_and_migrate_undo_callbacks():
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     upd = gov._update_undo(
         {"vm_ext_id": "v1"}, {"priorState": {"numSockets": 2, "memoryBytes": 4}})
@@ -73,7 +73,7 @@ def test_update_and_migrate_undo_callbacks():
 
 @pytest.mark.unit
 def test_storage_update_undo_callback():
-    from mcp_server.tools import storage as gov
+    from nutanix_aiops.mcp_server.tools import storage as gov
 
     d = gov._update_undo(
         {"ext_id": "sc1"}, {"priorState": {"maxCapacityBytes": 10, "replicationFactor": 2}})
@@ -90,7 +90,7 @@ def test_storage_update_undo_callback():
 
 @pytest.mark.unit
 def test_vm_power_on_twin_records_undo_on_disk(gov_home, monkeypatch):
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = ({"data": {"extId": "v1", "name": "web01",
@@ -105,7 +105,7 @@ def test_vm_power_on_twin_records_undo_on_disk(gov_home, monkeypatch):
 
 @pytest.mark.unit
 def test_vm_delete_dry_run_previews_without_mutating(gov_home, monkeypatch):
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = ({"data": {"extId": "v1", "name": "web01",
@@ -120,7 +120,7 @@ def test_vm_delete_dry_run_previews_without_mutating(gov_home, monkeypatch):
 
 @pytest.mark.unit
 def test_vm_migrate_dry_run_previews_without_mutating(gov_home, monkeypatch):
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = ({"data": {"extId": "v1", "name": "web01",
@@ -136,7 +136,7 @@ def test_vm_migrate_dry_run_previews_without_mutating(gov_home, monkeypatch):
 
 @pytest.mark.unit
 def test_vm_delete_twin_executes_and_audits(gov_home, monkeypatch):
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = ({"data": {"extId": "v1", "name": "web01",
@@ -150,7 +150,7 @@ def test_vm_delete_twin_executes_and_audits(gov_home, monkeypatch):
 
 @pytest.mark.unit
 def test_storage_container_create_and_update_twins(gov_home, monkeypatch):
-    from mcp_server.tools import storage as gov
+    from nutanix_aiops.mcp_server.tools import storage as gov
 
     conn = MagicMock(name="conn")
     conn.post.return_value = {"data": {"extId": "task-1"}}
@@ -170,7 +170,7 @@ def test_storage_container_create_and_update_twins(gov_home, monkeypatch):
 
 @pytest.mark.unit
 def test_snapshot_restore_and_pd_failover_dry_runs(gov_home, monkeypatch):
-    from mcp_server.tools import dataprotection as gov
+    from nutanix_aiops.mcp_server.tools import dataprotection as gov
 
     conn = MagicMock(name="conn")
     # The revert preview now READS the VM (one GET) so it can run the same
@@ -190,7 +190,7 @@ def test_snapshot_restore_and_pd_failover_dry_runs(gov_home, monkeypatch):
 
 @pytest.mark.unit
 def test_image_delete_twin_executes_and_captures_prior(gov_home, monkeypatch):
-    from mcp_server.tools import catalog as gov
+    from nutanix_aiops.mcp_server.tools import catalog as gov
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = ({"data": {"extId": "img-1", "name": "ubuntu.iso"}},
@@ -223,7 +223,7 @@ def test_vm_delete_dry_run_on_prism_central_is_refused(gov_home, monkeypatch):
     """Pins the WIRING: the wrapper must route its preview through the guarded
     ops.preview_delete_vm. Reverting it to the old get_vm call would still pass
     every ops-level test, so the assertion has to live here."""
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     conn = _pc_mcp_conn(_PC_VM)
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
@@ -237,7 +237,7 @@ def test_vm_delete_dry_run_on_prism_central_is_refused(gov_home, monkeypatch):
 @pytest.mark.unit
 def test_vm_delete_dry_run_on_a_normal_vm_still_returns_its_preview(gov_home, monkeypatch):
     """Proves the dry-run guard is EXACT, not blanket — same Prism Central target."""
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     conn = _pc_mcp_conn(_WEB_VM)
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
@@ -251,7 +251,7 @@ def test_vm_delete_dry_run_on_a_normal_vm_still_returns_its_preview(gov_home, mo
 
 @pytest.mark.unit
 def test_snapshot_restore_dry_run_on_prism_central_is_refused(gov_home, monkeypatch):
-    from mcp_server.tools import dataprotection as gov
+    from nutanix_aiops.mcp_server.tools import dataprotection as gov
 
     conn = _pc_mcp_conn(_PC_VM)
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
@@ -264,7 +264,7 @@ def test_snapshot_restore_dry_run_on_prism_central_is_refused(gov_home, monkeypa
 
 @pytest.mark.unit
 def test_snapshot_restore_dry_run_on_a_normal_vm_still_returns_its_preview(gov_home, monkeypatch):
-    from mcp_server.tools import dataprotection as gov
+    from nutanix_aiops.mcp_server.tools import dataprotection as gov
 
     conn = _pc_mcp_conn(_WEB_VM)
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)

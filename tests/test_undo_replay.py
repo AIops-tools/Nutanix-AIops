@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from mcp_server.tools import dataprotection as gov
+from nutanix_aiops.mcp_server.tools import dataprotection as gov
 from nutanix_aiops.ops import dataprotection as ops
 
 

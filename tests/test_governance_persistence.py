@@ -134,7 +134,7 @@ def test_real_write_tool_persists_priorstate_undo(gov_home, monkeypatch):
     )
     conn.put.return_value = {}
 
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: conn)
     result = gov.vm_update(vm_ext_id="v1", num_sockets=4)
@@ -371,7 +371,7 @@ def test_self_lockout_refusal_writes_no_undo_and_audits_as_error(gov_home, monke
     inverse for a power-off that never happened would be a lie, and it is exactly
     the unapplicable token this guard exists to prevent.
     """
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = (

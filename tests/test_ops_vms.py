@@ -356,7 +356,7 @@ def test_guard_matches_a_hostname_target_that_resolves_to_the_vms_ip(monkeypatch
 def test_refusal_messages_survive_the_300_char_cap():
     """The remedy sentence must reach the caller.
 
-    ``mcp_server._shared._safe_error`` passes a ValueError through but sanitizes
+    ``nutanix_aiops.mcp_server._shared._safe_error`` passes a ValueError through but sanitizes
     it to 300 characters, and the "use the hypervisor console" instruction is the
     LAST thing in the message. If a cost string grows, the teaching tail is what
     gets cut — silently.

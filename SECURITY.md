@@ -75,7 +75,7 @@ REST API endpoint (HTTPS :9440). No post-install scripts or background services.
 ## Static Analysis
 
 ```bash
-uvx bandit -r nutanix_aiops/ mcp_server/
+uvx bandit -r nutanix_aiops/
 uv run ruff check .
 ```
 

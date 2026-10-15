@@ -7,8 +7,8 @@ ETag handling for the image delete is automatic in the ops layer.
 
 from typing import Optional
 
-from mcp_server._shared import _get_connection, mcp, tool_errors
 from nutanix_aiops.governance import governed_tool
+from nutanix_aiops.mcp_server._shared import _get_connection, mcp, tool_errors
 from nutanix_aiops.ops import catalog as ops
 
 # ── reads ────────────────────────────────────────────────────────────────

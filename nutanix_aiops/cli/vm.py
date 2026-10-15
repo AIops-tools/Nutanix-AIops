@@ -65,7 +65,7 @@ def vm_power(
     dry_run: DryRunOption = False,
 ) -> None:
     """Change a VM's power state (on/off/shutdown/reboot)."""
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     fns = {"on": gov.vm_power_on, "off": gov.vm_power_off,
            "shutdown": gov.vm_guest_shutdown, "reboot": gov.vm_reboot}
@@ -95,7 +95,7 @@ def vm_delete(
     dry_run: DryRunOption = False,
 ) -> None:
     """Delete a VM (destructive; dry-run + double confirm)."""
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     if dry_run:
         # Routed through the governed twin so the preview runs the same guards
@@ -122,7 +122,7 @@ def vm_migrate(
     dry_run: DryRunOption = False,
 ) -> None:
     """Live-migrate a VM to another host (dry-run + double confirm)."""
-    from mcp_server.tools import vms as gov
+    from nutanix_aiops.mcp_server.tools import vms as gov
 
     if dry_run:
         # Routed through the governed twin: the preview runs the same guards and

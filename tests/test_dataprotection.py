@@ -47,7 +47,7 @@ def test_create_snapshot_posts_to_vm_snapshots_path_with_etag():
 
 @pytest.mark.unit
 def test_write_tools_have_correct_risk_tiers():
-    from mcp_server.tools import dataprotection as d
+    from nutanix_aiops.mcp_server.tools import dataprotection as d
 
     assert d.snapshot_create._risk_level == "medium"
     assert d.vm_protect._risk_level == "medium"
@@ -58,7 +58,7 @@ def test_write_tools_have_correct_risk_tiers():
 
 @pytest.mark.unit
 def test_mcp_snapshot_delete_dry_run_does_not_mutate(monkeypatch):
-    from mcp_server.tools import dataprotection as d
+    from nutanix_aiops.mcp_server.tools import dataprotection as d
 
     conn = MagicMock(name="conn")
     monkeypatch.setattr(d, "_get_connection", lambda target=None: conn)

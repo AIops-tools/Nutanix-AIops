@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 from typer.testing import CliRunner
 
-# Kept in sync with mcp_server/server.py (the full registered tool surface).
+# Kept in sync with nutanix_aiops/mcp_server/server.py (the full registered tool surface).
 EXPECTED_TOOLS = {
     # clusters
     "cluster_list", "cluster_health", "host_list", "cluster_utilization",
@@ -66,11 +66,11 @@ def test_all_modules_import():
         "nutanix_aiops.cli.overview",
         "nutanix_aiops.cli.doctor",
         "nutanix_aiops.cli.diagnostics",
-        "mcp_server.server",
-        "mcp_server._shared",
-        "mcp_server.tools.clusters",
-        "mcp_server.tools.vms",
-        "mcp_server.tools.diagnostics",
+        "nutanix_aiops.mcp_server.server",
+        "nutanix_aiops.mcp_server._shared",
+        "nutanix_aiops.mcp_server.tools.clusters",
+        "nutanix_aiops.mcp_server.tools.vms",
+        "nutanix_aiops.mcp_server.tools.diagnostics",
     ):
         importlib.import_module(name)
 
@@ -122,7 +122,7 @@ def test_cli_leaf_help_triggers_lazy_imports():
 
 @pytest.mark.unit
 def test_mcp_list_tools_exposes_expected_tools():
-    from mcp_server.server import mcp
+    from nutanix_aiops.mcp_server.server import mcp
 
     tools = asyncio.run(mcp.list_tools())
     names = {t.name for t in tools}
@@ -131,7 +131,7 @@ def test_mcp_list_tools_exposes_expected_tools():
 
 @pytest.mark.unit
 def test_every_mcp_tool_is_governed_by_harness():
-    from mcp_server import _shared
+    from nutanix_aiops.mcp_server import _shared
 
     tool_objs = _shared.mcp._tool_manager._tools
     assert EXPECTED_TOOLS <= set(tool_objs), "tool registry incomplete"
@@ -148,7 +148,7 @@ def test_every_mcp_tool_is_governed_by_harness():
 
 @pytest.mark.unit
 def test_write_tools_have_correct_risk_tiers():
-    from mcp_server.tools import vms as v
+    from nutanix_aiops.mcp_server.tools import vms as v
 
     assert v.vm_power_on._risk_level == "medium"
     assert v.vm_power_off._risk_level == "medium"
@@ -252,7 +252,7 @@ def test_list_all_auto_paginates(monkeypatch):
 @pytest.mark.unit
 def test_vm_power_on_records_undo_via_harness(monkeypatch):
     import nutanix_aiops.governance.undo as undo_mod
-    from mcp_server.tools import vms as v
+    from nutanix_aiops.mcp_server.tools import vms as v
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = ({"data": {"extId": "v1", "name": "web01",
@@ -292,7 +292,7 @@ def test_delete_vm_captures_before_state():
 
 @pytest.mark.unit
 def test_mcp_vm_delete_dry_run_does_not_mutate(monkeypatch):
-    from mcp_server.tools import vms as v
+    from nutanix_aiops.mcp_server.tools import vms as v
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = ({"data": {"extId": "v1", "name": "db01",
@@ -313,7 +313,7 @@ def test_cli_vm_delete_dry_run_gates(monkeypatch):
     reads so it can run the same guards as the real delete. It routes through
     the governed twin, so the risk=high tier is tagged on its audit row too.
     """
-    import mcp_server.tools.vms as gov
+    import nutanix_aiops.mcp_server.tools.vms as gov
     from nutanix_aiops.cli import app
 
     monkeypatch.setenv("NUTANIX_AUDIT_APPROVED_BY", "tester")
@@ -375,7 +375,7 @@ def test_risk_level_agrees_with_read_write_docstring_tag():
     16 such mislabels line-wide once, so it is kept even though read-only mode
     (its original motivation) is gone.
     """
-    from mcp_server import server
+    from nutanix_aiops.mcp_server import server
 
     untagged, mismatched = [], []
     for name, tool in server.mcp._tool_manager._tools.items():

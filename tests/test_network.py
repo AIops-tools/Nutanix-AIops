@@ -67,7 +67,7 @@ def test_get_subnet_returns_etag_via_get_with_etag():
 
 @pytest.mark.unit
 def test_write_tools_have_correct_risk_tiers():
-    from mcp_server.tools import network as n
+    from nutanix_aiops.mcp_server.tools import network as n
 
     assert n.subnet_create._risk_level == "medium"
     assert n.subnet_delete._risk_level == "high"
@@ -75,7 +75,7 @@ def test_write_tools_have_correct_risk_tiers():
 
 @pytest.mark.unit
 def test_mcp_subnet_delete_dry_run_does_not_mutate(monkeypatch):
-    from mcp_server.tools import network as n
+    from nutanix_aiops.mcp_server.tools import network as n
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = (

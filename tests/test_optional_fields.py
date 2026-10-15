@@ -104,7 +104,7 @@ def test_ops_never_drop_the_key_itself():
 @pytest.mark.unit
 def test_a_null_power_state_does_not_crash_the_undo_callback():
     """The undo builder reads priorState.powerState — which may now be null."""
-    from mcp_server.tools.vms import _power_undo
+    from nutanix_aiops.mcp_server.tools.vms import _power_undo
 
     assert _power_undo({"vm_ext_id": "vm-1"}, {"priorState": {"powerState": None}}) is None
     undo = _power_undo({"vm_ext_id": "vm-1"}, {"priorState": {"powerState": "ON"}})
@@ -172,7 +172,7 @@ def test_limit_is_clamped_to_a_sane_range():
 @pytest.mark.unit
 def test_undo_list_reports_truncation(monkeypatch):
     """The one pre-existing limit-bearing tool now announces a capped listing."""
-    from mcp_server.tools import undo as undo_tools
+    from nutanix_aiops.mcp_server.tools import undo as undo_tools
 
     rows = [
         {"undo_id": f"u{i}", "ts": "t", "tool": "vm_delete",

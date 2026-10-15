@@ -60,7 +60,7 @@ def test_perform_update_posts_right_body_and_entity_count():
 
 @pytest.mark.unit
 def test_write_tools_have_correct_risk_tiers():
-    from mcp_server.tools import lcm
+    from nutanix_aiops.mcp_server.tools import lcm
 
     assert lcm.lcm_update._risk_level == "high"
     assert lcm.lcm_precheck._risk_level == "medium"
@@ -68,7 +68,7 @@ def test_write_tools_have_correct_risk_tiers():
 
 @pytest.mark.unit
 def test_mcp_update_dry_run_does_not_post(monkeypatch):
-    from mcp_server.tools import lcm
+    from nutanix_aiops.mcp_server.tools import lcm
 
     conn = _conn_with_precheck()
     monkeypatch.setattr(lcm, "_get_connection", lambda target=None: conn)
@@ -187,7 +187,7 @@ def test_precheck_guard_refuses_on_an_empty_task_record():
 @pytest.mark.unit
 def test_mcp_update_refuses_without_a_precheck(monkeypatch):
     """The MCP path refuses too — tool_errors flattens it into an error payload."""
-    from mcp_server.tools import lcm
+    from nutanix_aiops.mcp_server.tools import lcm
 
     conn = _conn_with_precheck()
     monkeypatch.setattr(lcm, "_get_connection", lambda target=None: conn)
@@ -200,7 +200,7 @@ def test_mcp_update_refuses_without_a_precheck(monkeypatch):
 @pytest.mark.unit
 def test_mcp_update_dry_run_refuses_without_a_precheck(monkeypatch):
     """(c) A preview must never promise an update the real call would refuse."""
-    from mcp_server.tools import lcm
+    from nutanix_aiops.mcp_server.tools import lcm
 
     conn = _conn_with_precheck()
     monkeypatch.setattr(lcm, "_get_connection", lambda target=None: conn)
@@ -214,7 +214,7 @@ def test_mcp_update_dry_run_refuses_without_a_precheck(monkeypatch):
 @pytest.mark.unit
 def test_mcp_update_dry_run_refuses_on_a_failed_precheck(monkeypatch):
     """Preview and write agree on a precheck that ran and failed, too."""
-    from mcp_server.tools import lcm
+    from nutanix_aiops.mcp_server.tools import lcm
 
     conn = _conn_with_precheck(status="FAILED")
     monkeypatch.setattr(lcm, "_get_connection", lambda target=None: conn)
@@ -229,8 +229,8 @@ def test_mcp_update_dry_run_refuses_on_a_failed_precheck(monkeypatch):
 @pytest.mark.unit
 def test_precheck_refusal_messages_fit_the_error_cap():
     """The remedy sentence comes last, so a truncated message loses the instruction."""
-    from mcp_server._shared import _ERROR_MAX
     from nutanix_aiops.connection import NutanixApiError
+    from nutanix_aiops.mcp_server._shared import _ERROR_MAX
     from nutanix_aiops.ops import lcm as ops
 
     conn = _conn_with_precheck(status="FAILED")

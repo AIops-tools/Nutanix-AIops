@@ -16,8 +16,8 @@ from typer.testing import CliRunner
 import nutanix_aiops.governance.audit as audit_mod
 import nutanix_aiops.governance.policy as policy_mod
 import nutanix_aiops.governance.undo as undo_mod
-from mcp_server._shared import mcp
 from nutanix_aiops.governance import governed_tool
+from nutanix_aiops.mcp_server._shared import mcp
 
 runner = CliRunner()
 _CALLS: list[dict] = []

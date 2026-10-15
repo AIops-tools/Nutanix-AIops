@@ -49,7 +49,7 @@ def test_assign_category_posts_entity_list():
 
 @pytest.mark.unit
 def test_write_tools_have_correct_risk_tiers():
-    from mcp_server.tools import catalog as c
+    from nutanix_aiops.mcp_server.tools import catalog as c
 
     assert c.image_delete._risk_level == "high"
     assert c.category_create._risk_level == "medium"
@@ -58,7 +58,7 @@ def test_write_tools_have_correct_risk_tiers():
 
 @pytest.mark.unit
 def test_mcp_image_delete_dry_run_does_not_mutate(monkeypatch):
-    from mcp_server.tools import catalog as c
+    from nutanix_aiops.mcp_server.tools import catalog as c
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = ({"data": {"extId": "img-1", "name": "old.iso"}},

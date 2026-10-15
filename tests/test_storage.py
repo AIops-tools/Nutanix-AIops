@@ -50,7 +50,7 @@ def test_update_captures_prior_state_and_sends_etag():
 
 @pytest.mark.unit
 def test_write_tools_have_correct_risk_tiers():
-    from mcp_server.tools import storage
+    from nutanix_aiops.mcp_server.tools import storage
 
     assert storage.storage_container_create._risk_level == "medium"
     assert storage.storage_container_update._risk_level == "medium"
@@ -59,7 +59,7 @@ def test_write_tools_have_correct_risk_tiers():
 
 @pytest.mark.unit
 def test_mcp_delete_dry_run_does_not_mutate(monkeypatch):
-    from mcp_server.tools import storage
+    from nutanix_aiops.mcp_server.tools import storage
 
     conn = MagicMock(name="conn")
     conn.get_with_etag.return_value = (
