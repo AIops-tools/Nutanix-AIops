@@ -2,6 +2,8 @@
 
 # Nutanix AIops
 
+> **Audit availability:** Real writes require a committed `pending` audit row and stop before contacting the platform if storage is unavailable. Reads and previews may continue with a warning; new audit rows store outcome summaries rather than full responses.
+
 > **Disclaimer**: Community-maintained open-source project. **Not affiliated with, endorsed by, or sponsored by Nutanix.** Product and trademark names belong to their owners. MIT licensed.
 
 Governed AI-ops for **Nutanix Prism Central** (v4 REST API) — clusters, hosts,
@@ -153,7 +155,7 @@ The CLI is a convenience subset — the full 51-tool surface is via the MCP serv
 
 Every MCP tool passes through the bundled `@governed_tool` harness:
 
-- **Audit** — every call (params, result, status, duration, risk tier, and any
+- **Audit** — every call (params, outcome summary, status, duration, risk tier, and any
   operator-supplied approver/rationale) is logged to `~/.nutanix-aiops/audit.db`
   (relocatable via `NUTANIX_AIOPS_HOME`). The CLI writes the same row the MCP
   path does — there is no unaudited entry point.
